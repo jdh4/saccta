@@ -50,7 +50,7 @@ def get_host():
 host = get_host()
 # checkgpu is only available on three login nodes
 checkgpu_hosts = ("della-gpu", "tigergpu", "traverse")
-ondemand_hosts = ("adroit", "della")  # ignore stellar
+ondemand_hosts = ("adroit", "della", "stellar-amd")
 
 if host == "tigergpu":
   partition = "--partition gpu"
