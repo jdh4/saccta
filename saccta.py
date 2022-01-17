@@ -426,13 +426,14 @@ pairs = pairs.sort_values(by="cpu-hours", ascending=False).reset_index(drop=True
 pairs.partition = pairs.partition.str.replace("datascience", "datasci", regex=False)
 print(pairs)
 
-# how many users have more than one Slurm account
-accts = pairs["netid"].value_counts()
-ans = accts[accts > 1].size
-if ans > 0:
-  print("\n\n")
-  print(accts[accts > 1].sort_values(ascending=False))
-print(f"\nThere are {ans} users with more than one Slurm account.\n\n")
+if not collapse_slurm_accounts_per_user:
+  # how many users have more than one Slurm account
+  accts = pairs["netid"].value_counts()
+  ans = accts[accts > 1].size
+  if ans > 0:
+    print("\n\n")
+    print(accts[accts > 1].sort_values(ascending=False))
+  print(f"\nThere are {ans} users with more than one Slurm account.\n\n")
 
 #sys.exit()
 
