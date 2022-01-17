@@ -1,6 +1,9 @@
 # this script cannot be ran blindly for sponsor, position and dept
 
-# on first pass, run over all partitions as a check for new partitions
+# on initial pass, run over all partitions as a check for new partitions
+
+# on first pass set collapse_slurm_accounts_per_user=True and take all data
+# except groupby account then run a second time with False for account data
 
 # run on della-gpu for della GPU data
 # run on della8 for della CPU data
@@ -24,6 +27,9 @@ end_date   = "2021-12-31T23:59:59"
 
 # generate latex files
 latex = True
+
+# groupby by netid (True) or netid-account (False)
+collapse_slurm_accounts_per_user = True
 
 slurmacct_states = False  # use Nielsen convention (True) or not (False)
 if slurmacct_states:
@@ -392,17 +398,29 @@ print("Total Jobs:", df.shape[0], "\n")
 ########################################################
 #  N E T I D - S L U R M    A C C O U N T    P A I R S
 ########################################################
+#df["cpu-eff"] = df.apply(lambda row: row["avecpu"] / row["elapsedraw"] if row["elapsedraw"] > 0 else -1, axis='columns')
 
 def uniq_list(x):
   return ",".join(sorted(set(x)))
 
 df["netid-account"] = df.apply(lambda row: row["netid"] + "@" + row["account"], axis='columns')
-#df["cpu-eff"] = df.apply(lambda row: row["avecpu"] / row["elapsedraw"] if row["elapsedraw"] > 0 else -1, axis='columns')
-pairs = df.groupby("netid-account").agg({"netid":"first", "account":"first", "netid-account":np.size, \
-                                         "partition":uniq_list, "cpu-hours":np.sum, \
-                                         "gpu-hours":np.sum, "gpu-job":np.sum, \
-                                         "q-hours":np.sum})
-pairs.rename(columns={"netid-account":"Total Jobs"}, inplace=True)
+if not collapse_slurm_accounts_per_user:
+    # needed when groupby account
+    pairs = df.groupby("netid-account").agg({"netid":"first", "account":"first", "netid-account":np.size, \
+                                             "partition":uniq_list, "cpu-hours":np.sum, \
+                                             "gpu-hours":np.sum, "gpu-job":np.sum, \
+                                             "q-hours":np.sum})
+    pairs.rename(columns={"netid-account":"Total Jobs"}, inplace=True)
+else:
+    # needed for all other calculations
+    pairs = df.groupby("netid").agg({"netid":np.size, "account":uniq_list, \
+                                             "partition":uniq_list, "cpu-hours":np.sum, \
+                                             "gpu-hours":np.sum, "gpu-job":np.sum, \
+                                             "q-hours":np.sum})
+    
+    pairs.rename(columns={"netid":"Total Jobs"}, inplace=True)
+    pairs["netid"] = pairs.index
+
 pairs["CPU Jobs"] = pairs.apply(lambda row: row["Total Jobs"] - row["gpu-job"], axis='columns')
 pairs = pairs.sort_values(by="cpu-hours", ascending=False).reset_index(drop=True)
 pairs.partition = pairs.partition.str.replace("datascience", "datasci", regex=False)
@@ -828,6 +846,8 @@ else:
     users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "CPU-Hours", "Total Jobs", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
   elif (host == "stellar-amd" and partition == "--partition gpu"):
     users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
+  elif (host == "stellar-amd" and partition == "--partition bigmem,cimes"):
+    users = users[["NetID", "Name", "Position", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
   else:
     users = users[["NetID", "Name", "Position", "User Dept", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
   print(users)
@@ -879,6 +899,7 @@ if host != "adroit":
     by_sponsor = add_proportion_in_parenthesis(by_sponsor, "GPU-Hours", replace=True)
     by_sponsor = add_proportion_in_parenthesis(by_sponsor, "Q-Hours", replace=True)
     by_sponsor["Slurm Accounts"] = by_sponsor["Slurm Accounts"].apply(lambda x: x.upper())
+    by_sponsor["Slurm Accounts"] = by_sponsor["Slurm Accounts"].apply(lambda x: ",".join(sorted(set(x.split(",")))))
     if host in checkgpu_hosts:
       by_sponsor = by_sponsor[["Sponsor", "Slurm Accounts", "GPU-Hours", "Number of Users", "Q-Hours"]]
       print(by_sponsor)
