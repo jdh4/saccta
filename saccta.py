@@ -528,6 +528,8 @@ else:
 pairs.POSITION = pairs.POSITION.str.replace(' \(formerly G[0-9]\)', '', regex=True)  # RCU/DCU/Casual
 pairs.POSITION = pairs.POSITION.str.replace('Alumni \(G[0-9]\)', 'Alumni', regex=True)
 pairs.POSITION = pairs.POSITION.str.replace('Staff (visitor)', 'Staff', regex=False)
+pairs.DEPT = pairs.DEPT.fillna("UNKNOWN")
+
 
 ################################
 # M A N U E L    U P D A T E S
