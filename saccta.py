@@ -531,9 +531,10 @@ pairs.POSITION = pairs.POSITION.str.replace('Staff (visitor)', 'Staff', regex=Fa
 pairs.DEPT = pairs.DEPT.fillna("UNKNOWN")
 
 
-################################
+##################################################
 # M A N U E L    U P D A T E S
-################################
+# be weary of users with multiple Slurm accounts
+##################################################
 #if host == "tigergpu":
   #pairs.at[pairs[pairs.netid == "alvaros"].index[0], "NAME"] = "Álvaro Luna"
   #pairs.at[pairs[pairs.netid ==  "hzerze"].index[0], "NAME"] = "Gül Zerze"
@@ -669,6 +670,7 @@ if host != "adroit":
   pairs.apply(lambda row: check_sponsors_ldap_vs_desc(row["netid"], row["sponsor-ldap"], row["sponsor-desc"]), axis='columns')
   pairs["sponsor-trouble"] = pairs.netid.apply(lambda x: 1 if x in netids_with_sponsor_trouble else None)
   # manually handle unusual sponsor cases by correcting sponsor-getent based on cses ldap
+  # be weary of users with multiple Slurm accounts
   if host == "tigercpu" or host == "tigergpu":
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Shirkey, Jaden D.,MolBio,Nieng Yan", "Nieng Yan", regex=False)
