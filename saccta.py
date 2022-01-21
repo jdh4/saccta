@@ -549,6 +549,7 @@ pairs.DEPT = pairs.DEPT.fillna("UNKNOWN")
 if host == "tigergpu":
   #pairs.at[pairs[pairs.netid == "alvaros"].index[0], "NAME"] = "Álvaro Luna"
   #pairs.at[pairs[pairs.netid ==  "hzerze"].index[0], "NAME"] = "Gül Zerze"
+  pass
 if host == "tigercpu":
   #pairs.at[pairs[pairs.netid ==  "fj4172"].index[0], "NAME"] = "Farzaneh Jahanbakhshi"
   #pairs.at[pairs[pairs.netid == "yixiaoc"].index[0], "NAME"] = "Yixiao Chen"
@@ -560,17 +561,21 @@ if host == "tigercpu":
   #pairs.at[pairs[pairs.netid ==  "grighi"].index[0], "POSITION"] = "G5"
   #pairs.at[pairs[pairs.netid ==    "brio"].index[0], "NAME"] = "Beatriz Gonzalez del Rio"
   #pairs.at[pairs[pairs.netid ==    "brio"].index[0], "POSITION"] = "Staff"
+  pass
 if host == "della":
   #pairs.DEPT = pairs.DEPT.str.replace('203 BOBST HALL', 'UNKNOWN', regex=False)
   #pairs.at[pairs[pairs.netid == "bgovil"].index[0], "DEPT"] = "UNKNOWN"
+  pass
 if host == "della-gpu":
   #pairs.at[pairs[pairs.netid == "yixiaoc"].index[0], "NAME"] = "Yixiao Chen"
+  pass
 if host == "adroit":
   #pairs.at[pairs[pairs.netid == "jw2918"].index[0], "DEPT"] = "PHYSICS"
   #pairs.at[pairs[pairs.netid == "jw2918"].index[0], "POSITION"] = "RCU"
   #pairs.at[pairs[pairs.netid ==  "pbisbal"].index[0], "NAME"] = "Prentice Bisbal"
   #pairs.at[pairs[pairs.netid == "efleisig"].index[0], "NAME"] = "Eve N. Fleisig"
   #pairs.at[pairs[pairs.netid == "danieleg"].index[0], "NAME"] = "Daniel E. Gitelman"
+  pass
 print(pairs)
 
 #sys.exit()
@@ -697,6 +702,7 @@ if host != "adroit":
   else:
     rk = pd.DataFrame({"Netid_":pairs.netid, "Sponsor_Name_":pairs.shape[0] * [np.nan], \
                        "Sponsor_Netid_":pairs.shape[0] * [np.nan]})
+  print("\n\nFirst few lines of rk:\n")
   print(rk.head())
   pairs = pairs.merge(rk, how="left", left_on="netid", right_on="Netid_")
   
@@ -713,12 +719,12 @@ if host != "adroit":
   pairs["sponsor-desc"] = pairs.netid.apply(get_sponsors_from_description)
   print("done.", flush=True)
 
-    print("Comparing the three possible values for sponsor netid ... ", flush=True, end="")
+  print("Comparing the three possible values for sponsor netid ... ", flush=True, end="")
   pairs["sponsor-best"] = pairs.apply(lambda row: primary_vs_clusterspecific_vs_rk(row["netid"], \
                                       row["sponsor-ldap"], row["sponsor-desc"], row["Sponsor_Netid_"]), axis='columns')
   print("done.", flush=True, end="\n\n")
 
-  print("\n\nUsers with no sponsor (before manual corrections):\n")
+  print("\n\nUsers with no sponsor (BEFORE manual corrections):\n")
   print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
 
   # M A N U A L    C O R R E C T I O N S    O N   S P O N S O R    N E T I D
@@ -753,7 +759,7 @@ if host != "adroit":
     pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-name"] = "Eliot Quataert"
     pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-name"] = "M. Cohen"
 
-  print("\n\nUsers with no sponsor (after manual corrections):\n")
+  print("\n\nUsers with no sponsor (AFTER manual corrections):\n")
   print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
 
   print("Running getent passwd on best sponsor ... ", flush=True, end="")
@@ -769,6 +775,7 @@ if host != "adroit":
   pairs["sponsor-name"]   = pairs["sponsor-name"].apply(format_sponsor)
 
   #print(pairs[["netid", "sponsor-ldap", "sponsor-desc", "Sponsor_Netid_", "sponsor-best", "sponsor-name", "sponsor-getent", "Sponsor_Name_"]])
+  print("\nUsers with sponsor trouble:")
   print(netids_with_sponsor_trouble)
   pairs["sponsor-trouble"] = pairs.netid.apply(lambda x: 1 if x in netids_with_sponsor_trouble else None)
 
