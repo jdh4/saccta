@@ -128,7 +128,10 @@ print("\nRemoved rows where alloctres == NULL and cpu-seconds == 0")
 df = df[~(df.state == "RUNNING")]
 print("Removed rows where state == RUNNING", "\n")
 
+df.account = df.account.str.replace("wws", "spia", regex=False)
+
 # next line serves as check of data type and may cause error
+# if encounter error then change jobname to jobid in sacct call above (but then no ondemand data)
 df["start"] = df["start"].astype("int64")
 
 # a small number of jobs have "Unknown" as eligible with non-null alloctres and state "COMPLETED"
@@ -515,7 +518,7 @@ def get_name_getent_passwd(netid):
         print(f"WARNING: could not get name for {netid} ({fullname}).")
         return None
     else:
-      print(f"NOTSIXCOLON for {netid}")
+      print(f"NOTSIXCOLON for {netid} in get_name_getent_passwd()")
       return None
 
 # overwrite value from dossier since a few are usually corrupted
@@ -553,6 +556,11 @@ if host == "tigercpu":
   #pairs.at[pairs[pairs.netid ==   "alemay"].index[0], "NAME"] = "Amélie Lemay"
   #pairs.at[pairs[pairs.netid == "ccaimapo"].index[0], "NAME"] = "Carlos Eduardo Hervias Caimapo"
   #pairs.at[pairs[pairs.netid ==   "hzerze"].index[0], "NAME"] = "Gül Zerze"
+  pairs.at[pairs[pairs.netid == "mathewm"].index[0], "NAME"] = "Mathew Syriac Madhavacheril"
+  #pairs.at[pairs[pairs.netid ==  "grighi"].index[0], "NAME"] = "Giulia Righi"
+  #pairs.at[pairs[pairs.netid ==  "grighi"].index[0], "POSITION"] = "G5"
+  #pairs.at[pairs[pairs.netid ==    "brio"].index[0], "NAME"] = "Beatriz Gonzalez del Rio"
+  #pairs.at[pairs[pairs.netid ==    "brio"].index[0], "POSITION"] = "Staff"
 if host == "della":
   #pairs.DEPT = pairs.DEPT.str.replace('203 BOBST HALL', 'UNKNOWN', regex=False)
   pairs.at[pairs[pairs.netid == "bgovil"].index[0], "DEPT"] = "UNKNOWN"
@@ -573,6 +581,15 @@ print(pairs)
 #################
 # S P O N S O R
 #################
+
+# The primary sponsor is obtained by calling:
+# ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright manager
+# In some cases the above produces multiple primary sponsors.
+# The cluster-specific sponsor is obtained by:
+# ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright description
+# For users that have left, one can use R. Knight's CSV file to maybe find their sponsor
+# Rules are then applied between these three sources to find the correct sponsor for each user
+# Manual corrections can be made as the last step
 
 def get_sponsors_cses_ldap(netid):
   # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=jdh4 manager
