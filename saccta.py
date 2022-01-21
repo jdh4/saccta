@@ -732,32 +732,31 @@ if host != "adroit":
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Shirkey, Jaden D.,MolBio,Nieng Yan", "Nieng Yan", regex=False)
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Mathew Syriac Madhavacheril,Astro,Robert H. Lupton,Jo Dunkley", "Robert H. Lupton", regex=False)
-    pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "rcar"
-    pairs.at[pairs[pairs.netid ==  "mathewm"].index[0], "sponsor-best"] = "rhl"
+    #pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "rcar"
+    #pairs.at[pairs[pairs.netid ==  "mathewm"].index[0], "sponsor-best"] = "rhl"
   if host == "tigercpu":
     # mistake with jennyg -> description: tiger:USER=MzA5NDE=
-    pairs.at[pairs[pairs.netid == "jennyg"].index[0], "sponsor-best"] = "jennyg"
-    #pairs.at[pairs[pairs.netid == "fj4172"].index[0], "sponsor-name"] = "E. Carter"
+    #pairs.at[pairs[pairs.netid == "jennyg"].index[0], "sponsor-best"] = "jennyg"
+    #pairs.at[pairs[pairs.netid == "fj4172"].index[0], "sponsor-best"] = "E. Carter"
+    pass
   if host == "tigergpu":
-    pairs.at[pairs[pairs.netid ==  "ksabsay"].index[0], "sponsor-name"] = "W. Bialek"
-    pairs.at[pairs[pairs.netid == "gbwright"].index[0], "sponsor-name"] = "W. Tang"
+    #pairs.at[pairs[pairs.netid ==  "ksabsay"].index[0], "sponsor-best"] = "W. Bialek"
+    pass
   if host == "traverse":
-    pairs.at[pairs[pairs.netid ==    "jjara"].index[0], "sponsor-name"] = "Hantao Ji"
-    pairs.at[pairs[pairs.netid == "yiwasaki"].index[0], "sponsor-name"] = "Egemen Kolemen"
-    pairs.at[pairs[pairs.netid ==  "dpanici"].index[0], "sponsor-name"] = "Egemen Kolemen"
-    pairs.at[pairs[pairs.netid == "nmandell"].index[0], "sponsor-name"] = "Gregory Hammett"
-    pairs.at[pairs[pairs.netid ==   "apowis"].index[0], "sponsor-name"] = "Yevgeny Raitses"
+    pass
   if host == "della":
-    pairs.at[pairs[pairs.netid ==      "vbb"].index[0], "sponsor-name"] = "Vir B. Bulchandani"
-    pairs.at[pairs[pairs.netid == "ecmorale"].index[0], "sponsor-name"] = "Eduardo Morales"
-    pairs.at[pairs[pairs.netid == "eivshina"].index[0], "sponsor-name"] = "Joshua N. Winn"
-    pairs.at[pairs[pairs.netid == "pekalski"].index[0], "sponsor-name"] = "William M. Jacobs"
+    #pairs.at[pairs[pairs.netid ==      "vbb"].index[0], "sponsor-best"] = "Vir B. Bulchandani"
+    #pairs.at[pairs[pairs.netid == "ecmorale"].index[0], "sponsor-best"] = "Eduardo Morales"
+    #pairs.at[pairs[pairs.netid == "eivshina"].index[0], "sponsor-best"] = "Joshua N. Winn"
+    #pairs.at[pairs[pairs.netid == "pekalski"].index[0], "sponsor-best"] = "William M. Jacobs"
+    pass
   if host == "della-gpu":
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
-    pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-name"] = "R. Car"
+    #pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "R. Car"
   if host == "stellar-intel":
-    pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-name"] = "Eliot Quataert"
-    pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-name"] = "M. Cohen"
+    #pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-best"] = "Eliot Quataert"
+    #pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-best"] = "M. Cohen"
+    pass
 
   print("\n\nUsers with no sponsor (AFTER manual corrections):\n")
   print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
