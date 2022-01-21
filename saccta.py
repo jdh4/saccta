@@ -545,33 +545,32 @@ pairs.DEPT = pairs.DEPT.fillna("UNKNOWN")
 
 ##################################################
 # M A N U E L    U P D A T E S
-# be weary of users with multiple Slurm accounts
 ##################################################
-#if host == "tigergpu":
+if host == "tigergpu":
   #pairs.at[pairs[pairs.netid == "alvaros"].index[0], "NAME"] = "Álvaro Luna"
   #pairs.at[pairs[pairs.netid ==  "hzerze"].index[0], "NAME"] = "Gül Zerze"
 if host == "tigercpu":
-  pairs.at[pairs[pairs.netid ==  "fj4172"].index[0], "NAME"] = "Farzaneh Jahanbakhshi"
-  pairs.at[pairs[pairs.netid == "yixiaoc"].index[0], "NAME"] = "Yixiao Chen"
+  #pairs.at[pairs[pairs.netid ==  "fj4172"].index[0], "NAME"] = "Farzaneh Jahanbakhshi"
+  #pairs.at[pairs[pairs.netid == "yixiaoc"].index[0], "NAME"] = "Yixiao Chen"
   #pairs.at[pairs[pairs.netid ==   "alemay"].index[0], "NAME"] = "Amélie Lemay"
   #pairs.at[pairs[pairs.netid == "ccaimapo"].index[0], "NAME"] = "Carlos Eduardo Hervias Caimapo"
   #pairs.at[pairs[pairs.netid ==   "hzerze"].index[0], "NAME"] = "Gül Zerze"
-  pairs.at[pairs[pairs.netid == "mathewm"].index[0], "NAME"] = "Mathew Syriac Madhavacheril"
+  #pairs.at[pairs[pairs.netid == "mathewm"].index[0], "NAME"] = "Mathew Syriac Madhavacheril"
   #pairs.at[pairs[pairs.netid ==  "grighi"].index[0], "NAME"] = "Giulia Righi"
   #pairs.at[pairs[pairs.netid ==  "grighi"].index[0], "POSITION"] = "G5"
   #pairs.at[pairs[pairs.netid ==    "brio"].index[0], "NAME"] = "Beatriz Gonzalez del Rio"
   #pairs.at[pairs[pairs.netid ==    "brio"].index[0], "POSITION"] = "Staff"
 if host == "della":
   #pairs.DEPT = pairs.DEPT.str.replace('203 BOBST HALL', 'UNKNOWN', regex=False)
-  pairs.at[pairs[pairs.netid == "bgovil"].index[0], "DEPT"] = "UNKNOWN"
+  #pairs.at[pairs[pairs.netid == "bgovil"].index[0], "DEPT"] = "UNKNOWN"
 if host == "della-gpu":
-  pairs.at[pairs[pairs.netid == "yixiaoc"].index[0], "NAME"] = "Yixiao Chen"
+  #pairs.at[pairs[pairs.netid == "yixiaoc"].index[0], "NAME"] = "Yixiao Chen"
 if host == "adroit":
   #pairs.at[pairs[pairs.netid == "jw2918"].index[0], "DEPT"] = "PHYSICS"
   #pairs.at[pairs[pairs.netid == "jw2918"].index[0], "POSITION"] = "RCU"
-  pairs.at[pairs[pairs.netid ==  "pbisbal"].index[0], "NAME"] = "Prentice Bisbal"
-  pairs.at[pairs[pairs.netid == "efleisig"].index[0], "NAME"] = "Eve N. Fleisig"
-  pairs.at[pairs[pairs.netid == "danieleg"].index[0], "NAME"] = "Daniel E. Gitelman"
+  #pairs.at[pairs[pairs.netid ==  "pbisbal"].index[0], "NAME"] = "Prentice Bisbal"
+  #pairs.at[pairs[pairs.netid == "efleisig"].index[0], "NAME"] = "Eve N. Fleisig"
+  #pairs.at[pairs[pairs.netid == "danieleg"].index[0], "NAME"] = "Daniel E. Gitelman"
 print(pairs)
 
 #sys.exit()
@@ -607,11 +606,11 @@ def get_sponsors_getent_passwd(netid):
       if sponsor.count(",") == 2:
         return sponsor.split(",")[-1]
       else:
-        print(f"WARNING: {netid} is possibly co-sponsored ({sponsor}).")
+        print(f"WARNING: {netid} is possibly co-sponsored ({sponsor}).  Added to netids_with_sponsor_trouble.")
         netids_with_sponsor_trouble.append(netid)
         return sponsor
     else:
-      return "NOTSIXCOLON for {netid} in get_sponsors_getent_passwd()"
+      return f"NOTSIXCOLON for {netid} in get_sponsors_getent_passwd()"
 
 def get_sponsors_cses_ldap(netid):
   # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=jdh4 manager
@@ -663,7 +662,7 @@ def get_sponsors_from_description(netid):
     return None
   
 def format_sponsor(s):
-  if not s: return s
+  if (not s) or pd.isna(s): return s
   names = list(filter(lambda x: x not in ['Jr.', 'II', 'III', 'IV'], s.split()))
   if len(names) == 0:
     return None
