@@ -606,7 +606,7 @@ def get_sponsors_getent_passwd(netid):
       if sponsor.count(",") == 2:
         return sponsor.split(",")[-1]
       else:
-        print(f"WARNING: {netid} is possibly co-sponsored ({sponsor}).  Added to netids_with_sponsor_trouble.")
+        print(f"WARNING: {netid} is possibly co-sponsored ({sponsor}). Added to netids_with_sponsor_trouble.")
         netids_with_sponsor_trouble.append(netid)
         return sponsor
     else:
@@ -713,27 +713,25 @@ if host != "adroit":
   pairs["sponsor-desc"] = pairs.netid.apply(get_sponsors_from_description)
   print("done.", flush=True)
 
-  print("Running getent passwd on each sponsor ... ", flush=True, end="")
-  pairs["sponsor-name"] = pairs["sponsor-ldap"].apply(get_name_getent_passwd)
+    print("Comparing the three possible values for sponsor netid ... ", flush=True, end="")
+  pairs["sponsor-best"] = pairs.apply(lambda row: primary_vs_clusterspecific_vs_rk(row["netid"], \
+                                      row["sponsor-ldap"], row["sponsor-desc"], row["Sponsor_Netid_"]), axis='columns')
   print("done.", flush=True, end="\n\n")
 
-  # check
-  pairs.apply(lambda row: check_sponsors_ldap_vs_desc(row["netid"], row["sponsor-ldap"], row["sponsor-desc"]), axis='columns')
-  pairs["sponsor-trouble"] = pairs.netid.apply(lambda x: 1 if x in netids_with_sponsor_trouble else None)
-  # manually handle unusual sponsor cases by correcting sponsor-getent based on cses ldap
-  # be weary of users with multiple Slurm accounts
+  print("\n\nUsers with no sponsor (before manual corrections):\n")
+  print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
+
+  # M A N U A L    C O R R E C T I O N S    O N   S P O N S O R    N E T I D
   if host == "tigercpu" or host == "tigergpu":
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
     pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Shirkey, Jaden D.,MolBio,Nieng Yan", "Nieng Yan", regex=False)
-    pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-name"] = "R. Car"
-    pairs.at[pairs[pairs.netid == "kaichieh"].index[0], "sponsor-name"] = "P. Ramadge"
-    pairs.at[pairs[pairs.netid == "pinchenx"].index[0], "sponsor-name"] = "W. E"
-    pairs.at[pairs[pairs.netid ==   "chhahn"].index[0], "sponsor-name"] = "D. Spergel"
+    pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Mathew Syriac Madhavacheril,Astro,Robert H. Lupton,Jo Dunkley", "Robert H. Lupton", regex=False)
+    pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "rcar"
+    pairs.at[pairs[pairs.netid ==  "mathewm"].index[0], "sponsor-best"] = "rhl"
   if host == "tigercpu":
     # mistake with jennyg -> description: tiger:USER=MzA5NDE=
-    pairs.at[pairs[pairs.netid ==  "hejia"].index[0], "sponsor-name"] = "R. Cen"
-    pairs.at[pairs[pairs.netid == "jennyg"].index[0], "sponsor-name"] = "J. Greene"
-    pairs.at[pairs[pairs.netid == "fj4172"].index[0], "sponsor-name"] = "E. Carter"
+    pairs.at[pairs[pairs.netid == "jennyg"].index[0], "sponsor-best"] = "jennyg"
+    #pairs.at[pairs[pairs.netid == "fj4172"].index[0], "sponsor-name"] = "E. Carter"
   if host == "tigergpu":
     pairs.at[pairs[pairs.netid ==  "ksabsay"].index[0], "sponsor-name"] = "W. Bialek"
     pairs.at[pairs[pairs.netid == "gbwright"].index[0], "sponsor-name"] = "W. Tang"
@@ -755,15 +753,34 @@ if host != "adroit":
     pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-name"] = "Eliot Quataert"
     pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-name"] = "M. Cohen"
 
-  pairs["sponsor-getent"] = pairs["sponsor-getent"].apply(format_sponsor)  # this line must follow the replacements
+  print("\n\nUsers with no sponsor (after manual corrections):\n")
+  print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
+
+  print("Running getent passwd on best sponsor ... ", flush=True, end="")
+  pairs["sponsor-name"] = pairs["sponsor-best"].apply(get_name_getent_passwd)
+  print("done.", flush=True, end="\n\n")
+  pairs["sponsor-name"] = pairs["sponsor-name"].fillna("UNKNOWN")
+
+  # M A N U A L    C O R R E C T I O N S    O N   S P O N S O R    N A M E
+  if host == "tigercpu":
+    pairs.at[pairs[pairs.netid == "meerag"].index[0], "sponsor-name"] = "Martin Helmut Wuhr"
+  
+  pairs["sponsor-getent"] = pairs["sponsor-getent"].apply(format_sponsor)
   pairs["sponsor-name"]   = pairs["sponsor-name"].apply(format_sponsor)
 
+  #print(pairs[["netid", "sponsor-ldap", "sponsor-desc", "Sponsor_Netid_", "sponsor-best", "sponsor-name", "sponsor-getent", "Sponsor_Name_"]])
+  print(netids_with_sponsor_trouble)
+  pairs["sponsor-trouble"] = pairs.netid.apply(lambda x: 1 if x in netids_with_sponsor_trouble else None)
+
   # sponsor-getent is untrusted since it is obtained using the netid of the user instead directly using the netid of the sponsor
-  mismatch = pairs[pairs["sponsor-getent"] != pairs["sponsor-name"]][["netid", "sponsor-getent", "sponsor-name"]]
+  mismatch = pairs[pairs["sponsor-getent"] != pairs["sponsor-name"]][["netid", "sponsor-getent", "sponsor-name", "Sponsor_Netid_", "Sponsor_Name_"]]
   if not mismatch.empty:
+    print("\n\nsponsor-getent does not match sponsor-name:")
     print(mismatch, end="\n\n")
 
   print(pairs, end="\n\n")
+  #print(pairs[["netid", "sponsor-getent", "sponsor-ldap", "sponsor-desc", "Sponsor_Netid_", "sponsor-name", "Sponsor_Name_", "sponsor-trouble"]])
+
   print("***Examine the sponsor columns above for consistency. This must be done manually.***")
 
 #sys.exit()
@@ -882,7 +899,7 @@ else:
   elif (host == "stellar-amd" and partition == "--partition bigmem,cimes"):
     users = users[["NetID", "Name", "Position", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
   else:
-    users = users[["NetID", "Name", "Position", "User Dept", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
+    users = users[["NetID", "Name", "Position", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
   print(users)
   if latex:
     base = f"{host}_users"
