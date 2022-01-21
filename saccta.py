@@ -591,6 +591,28 @@ print(pairs)
 # Rules are then applied between these three sources to find the correct sponsor for each user
 # Manual corrections can be made as the last step
 
+def get_sponsors_getent_passwd(netid):
+  """This method is not an official way to get the sponsor of a user. This is called only for a
+     consistency check and can be ignored."""
+  cmd = f"getent passwd {netid}"
+  try:
+    output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=5, text=True, check=True)
+  except:
+    return "--"
+  else:
+    line = output.stdout
+    if line.count(":") == 6:
+      # jdh4:*:150340:20121:Jonathan D. Halverson,CSES,Curtis W. Hillegas:/home/jdh4:/bin/bash
+      sponsor = line.split(":")[4]
+      if sponsor.count(",") == 2:
+        return sponsor.split(",")[-1]
+      else:
+        print(f"WARNING: {netid} is possibly co-sponsored ({sponsor}).")
+        netids_with_sponsor_trouble.append(netid)
+        return sponsor
+    else:
+      return "NOTSIXCOLON for {netid} in get_sponsors_getent_passwd()"
+
 def get_sponsors_cses_ldap(netid):
   # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=jdh4 manager
   # manager: uid=curt,cn=users,cn=accounts,dc=rc,dc=princeton,dc=edu
@@ -609,38 +631,12 @@ def get_sponsors_cses_ldap(netid):
       managers.append(line.split("uid=")[1].split(",")[0])
   if len(managers) > 1:
     netids_with_sponsor_trouble.append(netid)
-  return ",".join(managers)
-
-def get_sponsors_getent_passwd(netid):
-  cmd = f"getent passwd {netid}"
-  try:
-    output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=5, text=True, check=True)
-  except:
-    return "--"
-  else:
-    line = output.stdout
-    if line.count(":") == 6:
-      # jdh4:*:150340:20121:Jonathan D. Halverson,CSES,Curtis W. Hillegas:/home/jdh4:/bin/bash
-      sponsor = line.split(":")[4]
-      if sponsor.count(",") == 2:
-        return sponsor.split(",")[-1]
-      else:
-        print(f"WARNING: {netid} is possibly co-sponsored ({sponsor}).")
-        netids_with_sponsor_trouble.append(netid)
-        return sponsor
-    else:
-      return "NOTSIXCOLON"
-
-def format_sponsor(s):
-  if not s: return s
-  names = list(filter(lambda x: x not in ['Jr.', 'II', 'III', 'IV'], s.split()))
-  if len(names) == 0:
+  if managers == []:
+    print(f"No primary sponsor found for {netid} in get_sponsors_cses_ldap()")
     return None
-  elif len(names) == 1:
-    return names[0]
   else:
-    return f"{names[0][0]}. {names[-1]}"
-
+    return ",".join(managers)
+    
 def get_sponsors_from_description(netid):
   # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=npetsev description
   # description: della:pdebene=dGlja2V0IDI5NjYx,perseus:pdebene=dGlja2V0IDI5NjYx,s
@@ -665,19 +661,49 @@ def get_sponsors_from_description(netid):
     return snetid if not "(" in snetid else snetid.split("(")[0].strip()
   else:
     return None
+  
+def format_sponsor(s):
+  if not s: return s
+  names = list(filter(lambda x: x not in ['Jr.', 'II', 'III', 'IV'], s.split()))
+  if len(names) == 0:
+    return None
+  elif len(names) == 1:
+    return names[0]
+  else:
+    return f"{names[0][0]}. {names[-1]}"
 
-def check_sponsors_ldap_vs_desc(netid, s_ldap, s_desc):
-  if (s_ldap != s_desc) and s_desc:
-    netids_with_sponsor_trouble.append(netid)
-    print(netid, s_ldap, s_desc)
+def primary_vs_clusterspecific_vs_rk(user_netid, primary, specific, rk):
+  if pd.notnull(primary) and pd.notnull(specific) and (primary != specific):
+    print(f"{user_netid} added to trouble since primary ({primary}) != specific ({specific})")
+    netids_with_sponsor_trouble.append(user_netid)
+    return specific
+  elif pd.isna(primary) and pd.isna(specific) and pd.notnull(rk):
+    return rk
+  elif pd.isna(primary) and pd.notnull(specific) and pd.notnull(rk):
+    print(f"{user_netid} added to trouble since primary is null and specific ({specific}) is not")
+    netids_with_sponsor_trouble.append(user_netid)
+    return specific
+  else:
+    return primary
 
 if host != "adroit":
   # global list
   netids_with_sponsor_trouble = []
 
+  # dataframe of users that left university
+  fname = "users_left_university_from_robert_knight.csv"
+  if os.path.exists(fname):
+    rk = pd.read_csv(fname)
+    rk.info()
+  else:
+    rk = pd.DataFrame({"Netid_":pairs.netid, "Sponsor_Name_":pairs.shape[0] * [np.nan], \
+                       "Sponsor_Netid_":pairs.shape[0] * [np.nan]})
+  print(rk.head())
+  pairs = pairs.merge(rk, how="left", left_on="netid", right_on="Netid_")
+  
   print("\n")
   print("Running getent passwd on each user ... ", flush=True, end="")
-  pairs["sponsor-getent"] = pairs.netid.apply(get_sponsors_getent_passwd)  #TDO: should return nothing and not add a column
+  pairs["sponsor-getent"] = pairs.netid.apply(get_sponsors_getent_passwd)
   print("done.", flush=True)
 
   print("Running ldapsearch (manager) on each user ... ", flush=True, end="")
