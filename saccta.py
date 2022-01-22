@@ -25,6 +25,9 @@ end_date   = "2021-12-31T23:59:59"
 # generate latex files
 latex = True
 
+# run test case
+test_case = False
+
 slurmacct_states = False  # use Nielsen convention (True) or not (False)
 if slurmacct_states:
   states = "-s ca,cd,f,to,pr,oom"
@@ -83,6 +86,7 @@ else:
   print("Host not recognized. Exiting.")
   sys.exit()
 
+
 # date range and host
 start_range = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S").strftime("%B %-d, %Y")
 end_range   = datetime.strptime(end_date,   "%Y-%m-%dT%H:%M:%S").strftime("%B %-d, %Y")
@@ -92,19 +96,38 @@ cluster_names = {"adroit":"Adroit", "della":"Della (CPU)", "della-gpu":"Della (G
                  "tigercpu":"TigerCPU", "tigergpu":"TigerGPU", "traverse":"Traverse"}
 caption_host = cluster_names[host]
 
+if test_case:
+  host = "test"
+  caption_host = "test"
+  partition = ""
+  qos_test = []
+
 if partition:
   print(f"\nRunning on {host} with {partition}\n")
 else:
   print(f"\nRunning on {host} over all partitions\n")
- 
+
 fname = f"{host}_sacct_{start_date}_{end_date}.csv".replace(":","-")
-if not os.path.exists(fname):
+cols = ["jobid", "netid", "account", "partition", "cpu-seconds", "elapsedraw", "alloctres", "start", "eligible", "qos", "state", "jobname"]
+if test_case:
+  # create test input
+  jobs = []
+  jobs.append(("42",   "jdh4", "cses", "gpu", "100000",  "10000", "billing=112,cpu=10,gres/gpu=2,mem=400M,node=1", "36000", "15000", "test-gpu", "COMPLETED", "jobname"))
+  jobs.append(("43",   "jdh4", "cses", "gpu", "200000",  "20000", "billing=112,cpu=10,gres/gpu=2,mem=400M,node=1", "37000", "16500", "test-gpu",    "FAILED", "sys/dashboard/sys/jupyter"))
+  jobs.append(("44",   "jdh4", "cses", "cpu", "222222", "222222", "billing=112,cpu=1,mem=4000M,node=1",            "42000", "11000", "test-cpu", "COMPLETED", "jobname"))
+  jobs.append(("66",   "curt", "cses", "cpu", "999999", "999999", "billing=112,cpu=1,mem=4000M,node=1",            "33000",  "2200", "test-cpu",    "FAILED", "jobname"))
+  jobs.append(("79", "yz8614",   "cs", "cpu", "600000", "600000", "billing=112,cpu=1,mem=4000M,node=1",            "92000", "11000", "test-cpu", "COMPLETED", "jobname"))
+  jobs.append(("80", "yz8614",   "cs", "gpu", "111100",  "11110", "billing=112,cpu=10,gres/gpu=1,mem=40G,node=1",  "64000", "32000", "test-gpu", "NODE_FAIL", "jobname"))
+  df_test = pd.DataFrame(jobs)
+  df_test.columns = cols
+  print(df_test)
+  df_test.to_csv(fname, index=False)
+elif not os.path.exists(fname):
   print("\nCalling sacct (which may require several seconds) ... ", end="", flush=True)
   # cputimeraw has units of cpu-seconds (it is equal to cores multiplied by elapsed)
   # pending jobs have cputimeraw of 0
   fmt = "jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname%50"
   # jobname must be last in next line to deal with "|" characters in a few lines
-  cols = ["jobid", "netid", "account", "partition", "cpu-seconds", "elapsedraw", "alloctres", "start", "eligible", "qos", "state", "jobname"]
   cmd = f"sacct -a -X -P -n -S {start_date} -E {end_date} -o {fmt} {states} {partition}"
   output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=600, text=True, check=True)
   lines = output.stdout.split('\n')
@@ -904,6 +927,19 @@ else:
     users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
   elif (host == "stellar-amd" and partition == "--partition bigmem,cimes"):
     users = users[["NetID", "Name", "Position", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
+  elif host == "test":
+    cols = ["NetID", "Name", "Position", "User Dept", "Partitions", "Sponsor", "Account", "CPU-Hours", "Total Jobs", "GPU-Hours", "GPU Jobs", "Q-Hours"]
+    users = users[cols]
+    answer = []
+    answer.append((  "curt",    "Curtis Hillegas", "Staff",    "CSES",     "cpu", "C. Hillegas", "CSES", "278 (44.8%)", "1 (16.7%)",   "0 (0.0%)",  "0 (0.0%)",  "9 (14.2%)"))
+    answer.append(("yz8614",       "Yuxuan Zhang",    "G1",      "CS", "cpu,gpu",    "F. Heide",   "CS", "198 (31.8%)", "2 (33.3%)",  "3 (15.6%)", "1 (33.3%)", "31 (52.2%)"))
+    answer.append((  "jdh4", "Jonathan Halverson", "Staff", "PICSciE", "cpu,gpu", "C. Hillegas", "CSES", "145 (23.4%)", "3 (50.0%)", "17 (84.4%)", "2 (66.7%)", "20 (33.5%)"))
+    answer = pd.DataFrame(answer)
+    answer.columns = cols
+    answer.index += 1
+    print(users)
+    print(answer)
+    print("\n***Success***\n\n") if users.equals(answer) else print("Fail")
   else:
     users = users[["NetID", "Name", "Position", "Sponsor", "Partitions", "Account", "CPU-Hours", "Total Jobs", "Q-Hours"]]
   print(users)
