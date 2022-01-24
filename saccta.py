@@ -141,7 +141,7 @@ elif not os.path.exists(fname):
 else:
   print("\nUsing sacct cache file.\n")
 
-df = pd.read_csv(fname)
+df = pd.read_csv(fname, low_memory=False)
 df.info()
 print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
 
