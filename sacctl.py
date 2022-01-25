@@ -123,6 +123,10 @@ if __name__ == "__main__":
   tmp = df[(df["elapsed-hours"] > 1) & (df.nodes > 1) & (df.nodes >= df.cores)][["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]]
   s += tmp.to_string(index=False, justify="center")
   #print(s)
+  
+  s += "\n\n=== Multinode jobs with 1 GPU per node: ===\n"
+  tmp = df[(df["elapsed-hours"] > 1) & (df.nodes > 1) & (df.gpus > 1) & (df.nodes >= df.gpus)][["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]]
+  s += tmp.to_string(index=False, justify="center")
 
   if email:
     # email
