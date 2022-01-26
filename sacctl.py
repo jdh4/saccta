@@ -13,6 +13,20 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+def send_email(s, addressee, sender="halverson@princeton.edu"):
+  msg = MIMEMultipart('alternative')
+  msg['Subject'] = "Slurm job alerts"
+  msg['From'] = sender
+  msg['To'] = addressee
+  text = "None"
+  html = f'<html><head></head><body><font face="Courier New, Courier, monospace"><pre>{s}</pre></font></body></html>'
+  part1 = MIMEText(text, 'plain'); msg.attach(part1) 
+  part2 = MIMEText(html, 'html');  msg.attach(part2)
+  s = smtplib.SMTP('localhost')
+  s.sendmail(sender, addressee, msg.as_string())
+  s.quit()
+  return None
+
 def get_raw_dataframe(start_date):
   fname = f"out-{start_date.replace(':','-')}.csv"
   if not os.path.exists(fname):
@@ -48,12 +62,13 @@ def gpus_per_job(tres):
 def is_gpu_job(tres):
   return 1 if "gres/gpu=" in tres and not "gres/gpu=0" in tres else 0
 
+
 if __name__ == "__main__":
 
   email = True
 
   num_days_ago = 7
-  start_date = (datetime.now() - timedelta(num_days_ago)).strftime("%Y-%m-%d")
+  start_date = datetime.now() - timedelta(num_days_ago)
 
   # pandas display settings
   pd.set_option('display.max_rows', None)
@@ -63,13 +78,14 @@ if __name__ == "__main__":
   # convert Slurm timestamps to seconds
   os.environ['SLURM_TIME_FORMAT'] = "%s"
 
-  df = get_raw_dataframe(f"{start_date}T00:00:00")
+  df = get_raw_dataframe(f"{start_date.strftime('%Y-%m-%d')}T00:00:00")
   if 0:
     df.info()
     print(df.describe())
   # filters
   # cleaning
   #df.state = df.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
+  df.cluster = df.cluster.str.replace("tiger2", "tiger")
 
   if 0:
     print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
@@ -91,7 +107,9 @@ if __name__ == "__main__":
   df["elapsed-hours"] = df.elapsedraw.apply(lambda x: round(x / seconds_per_hour, 1))
   df["start-date"] = df.start.apply(lambda x: x if x == "Unknown" else datetime.fromtimestamp(int(x)).date().strftime("%-m/%-d"))
   df["cpu-waste-hours"] = df.apply(lambda row: round((row["limit-minutes"] * seconds_per_minute - row["elapsedraw"]) * row["cores"] / seconds_per_hour), axis="columns")
-  df["gpu-waste-hours"] = df.apply(lambda row: round((row["limit-minutes"] * seconds_per_minute - row["elapsedraw"]) * row["gpus"] / seconds_per_hour), axis="columns")
+  df["gpu-waste-hours"] = df.apply(lambda row: round((row["limit-minutes"] * seconds_per_minute - row["elapsedraw"]) * row["gpus"]  / seconds_per_hour), axis="columns")
+  df["cpu-alloc-hours"] = df.apply(lambda row: round(row["limit-minutes"] * seconds_per_minute * row["cores"] / seconds_per_hour), axis="columns")
+  df["gpu-alloc-hours"] = df.apply(lambda row: round(row["limit-minutes"] * seconds_per_minute * row["gpus"]  / seconds_per_hour), axis="columns")
   df["cpu-hours"] = df["cpu-seconds"] / seconds_per_hour
   df["gpu-hours"] = df["gpu-seconds"] / seconds_per_hour
 
@@ -99,54 +117,42 @@ if __name__ == "__main__":
          ("della", ("gpu",), "gpu"), \
          ("stellar", ("all", "pppl", "pu", "serial"), "cpu"), \
          ("stellar", ("bigmem", "cimes"), "cpu"), \
-         ("tiger2", ("cpu", "ext", "serial"), "cpu"), \
-         ("tiger2", ("gpu",), "gpu"), \
+         ("tiger", ("cpu", "ext", "serial"), "cpu"), \
+         ("tiger", ("gpu",), "gpu"), \
          ("traverse", ("all",), "gpu"))
 
-  s = "=== Unused allocated CPU-Hours (of completed and 1+ hour jobs) ===\n"
+  fmt = "%a %b %-d"
+  s = f"{start_date.strftime(fmt)} -- {datetime.now().strftime(fmt)}\n\n"
+  s += f"Total users: {df.netid.unique().size}\n"
+  s += f"Total jobs:  {df.shape[0]}\n\n"
+  s += "========= Unused allocated CPU-Hours (of completed and 2+ hour jobs) =========\n"
   for cluster, partitions, xpu in cls:
     s += f"{cluster.upper()}\n"
-    d = {f"{xpu}-waste-hours":np.sum, f"{xpu}-hours":np.sum, "netid":np.size, "partition":lambda series: ",".join(sorted(set(series)))}
+    d = {f"{xpu}-waste-hours":np.sum, f"{xpu}-alloc-hours":np.sum, f"{xpu}-hours":np.sum, "netid":np.size, "partition":lambda series: ",".join(sorted(set(series)))}
     wh = df[(df.cluster == cluster) & \
             (df.state == "COMPLETED") & \
-            (df["elapsed-hours"] > 1) & \
-            (df.partition.isin(partitions))].groupby("netid").agg(d).rename(columns={"netid":"jobs"}).sort_values(by=f"{xpu}-waste-hours", ascending=False)
+            (df["elapsed-hours"] > 2) & \
+            (df.partition.isin(partitions))].groupby("netid").agg(d).rename(columns={"netid":"jobs"})
+    wh = wh.sort_values(by=f"{xpu}-hours", ascending=False).reset_index(drop=False)
+    wh["rank"] = wh.index + 1
+    wh = wh.sort_values(by=f"{xpu}-waste-hours", ascending=False)
     wh = wh[:5]
     wh[f"{xpu}-hours"] = wh[f"{xpu}-hours"].apply(round).astype("int64")
-    wh["ratio"] = round(wh[f"{xpu}-waste-hours"] / wh[f"{xpu}-hours"])
-    wh["ratio"] = wh["ratio"].astype("int64")
-    wh = wh[[f"{xpu}-waste-hours", f"{xpu}-hours", "ratio", "jobs", "partition"]]
-    s += wh[:5].to_string(index=True)
+    wh["ratio(%)"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
+    wh["ratio(%)"] = wh[f"ratio(%)"].apply(round).astype("int64")
+    wh = wh[["netid",f"{xpu}-waste-hours", f"{xpu}-alloc-hours", f"{xpu}-hours", "ratio(%)", "rank", "jobs", "partition"]]
+    s += wh.to_string(index=False, justify="center")
     s += "\n\n\n"
 
-  s += "\n\n=== Multinode jobs with 1 core per node: ===\n"
-  tmp = df[(df["elapsed-hours"] > 1) & (df.nodes > 1) & (df.nodes >= df.cores)][["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]]
+  s += "\n\n========= Multinode jobs with 1 core per node: =========\n"
+  tmp = df[(df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.nodes >= df.cores)][["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]]
   s += tmp.to_string(index=False, justify="center")
-  #print(s)
-  
-  s += "\n\n=== Multinode jobs with 1 GPU per node: ===\n"
-  tmp = df[(df["elapsed-hours"] > 1) & (df.nodes > 1) & (df.gpus > 1) & (df.nodes >= df.gpus)][["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]]
+
+  s += "\n\n========= Multinode jobs with 1 GPU per node: =========\n"
+  tmp = df[(df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.gpus > 1) & (df.nodes >= df.gpus)][["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]]
   s += tmp.to_string(index=False, justify="center")
 
   if email:
-    # email
-    me = "halverson@princeton.edu"
-    you = me
-
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = "Slurm Jobs"
-    msg['From'] = me
-    msg['To'] = you
-    text = "None"
-
-    html = '<html><head></head><body><font face="Courier New, Courier, monospace"><pre>' + \
-           s + \
-           '</pre></font></body></html>'
-
-    part1 = MIMEText(text, 'plain')
-    part2 = MIMEText(html, 'html')
-    msg.attach(part1)
-    msg.attach(part2)
-    s = smtplib.SMTP('localhost')
-    s.sendmail(me, you, msg.as_string())
-    s.quit()
+    send_email(s, "halverson@princeton.edu")
+  else:
+    print(s)
