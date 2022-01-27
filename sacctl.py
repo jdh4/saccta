@@ -60,6 +60,17 @@ def gpus_per_job(tres):
 def is_gpu_job(tres):
   return 1 if "gres/gpu=" in tres and not "gres/gpu=0" in tres else 0
 
+def excessive_queue_times(raw):
+  # sacct does not return queued jobs with a NODELIST(REASON) of (Dependency) or (JobHeldUser)
+  # below we use submit instead of eligible to compute the queued time
+  #raw.state = raw.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
+  q = raw[raw.state == "PENDING"].copy()
+  q["q-days"] = round((time.time() - q["submit"]) / seconds_per_hour / hours_per_day)
+  q["q-days"] = q["q-days"].astype("int64")
+  cols = ["jobid", "cluster", "netid", "q-days"]
+  q = q[cols].groupby("netid").apply(lambda d: d.iloc[d["q-days"].argmax()]).sort_values("q-days", ascending=False)[:10]
+  return q
+
 
 if __name__ == "__main__":
 
@@ -130,7 +141,7 @@ if __name__ == "__main__":
   s = f"{start_date.strftime(fmt)} -- {datetime.now().strftime(fmt)}\n\n"
   s += f"Total users: {df.netid.unique().size}\n"
   s += f"Total jobs:  {df.shape[0]}\n\n"
-  s += "========= Unused allocated CPU/GPU-Hours (of completed and 2+ hour jobs) =========\n"
+  s += "========= Unused allocated CPU/GPU-Hours (of completed/running and 2+ hour jobs) =========\n"
   for cluster, partitions, xpu in cls:
     s += f"{cluster.upper()}\n"
     d = {f"{xpu}-waste-hours":np.sum, f"{xpu}-alloc-hours":np.sum, f"{xpu}-hours":np.sum, "netid":np.size, "partition":lambda series: ",".join(sorted(set(series)))}
@@ -150,30 +161,25 @@ if __name__ == "__main__":
     s += "\n\n\n"
 
   s += "\n\n========= Multinode CPU jobs with 1 core per node: =========\n"
-  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date"]
+  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date", "start"]
   tmp = df[(df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.nodes >= df.cores)][cols]
+  tmp = tmp.sort_values("start", ascending=False).drop(columns=["start"])
   s += tmp.to_string(index=False, justify="center")
 
   s += "\n\n\n========= Multinode GPU jobs with 1 GPU per node: =========\n"
-  cols = ["jobid", "netid", "cluster", "nodes", "gpus", "elapsed-hours", "start-date"]
+  cols = ["jobid", "netid", "cluster", "nodes", "gpus", "elapsed-hours", "start-date", "start"]
   tmp = df[(df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.gpus > 1) & (df.nodes >= df.gpus)][cols]
+  tmp = tmp.sort_values("start", ascending=False).drop(columns=["start"])
   s += tmp.to_string(index=False, justify="center")
 
   s += "\n\n\n========= Jobs with the most GPUs: =========\n"
-  cols = ["jobid", "cluster", "netid", "gpus", "nodes", "elapsed-hours", "start-date"]
-  g = df[cols].groupby("netid").apply(lambda d: d.iloc[d["gpus"].argmax()]).sort_values("gpus", ascending=False)[:10]
+  cols = ["jobid", "cluster", "netid", "gpus", "nodes", "elapsed-hours", "start-date", "start"]
+  g = df[cols].groupby("netid").apply(lambda d: d.iloc[d["gpus"].argmax()])
+  g = g.sort_values("gpus", ascending=False)[:10].sort_values("start", ascending=False).drop(columns=["start"])
   s += g.to_string(index=False, justify="center")
 
   s += "\n\n\n=============== Excessive queue times ===============\n"
-  # sacct does not return queued jobs with a NODELIST(REASON) of (Dependency) or (JobHeldUser)
-  # below we use submit instead of eligible to compute the queued time
-  #raw.state = raw.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
-  q = raw[raw.state == "PENDING"].copy()
-  q["q-days"] = round((time.time() - q["submit"]) / seconds_per_hour / hours_per_day)
-  q["q-days"] = q["q-days"].astype("int64")
-  cols = ["jobid", "cluster", "netid", "q-days"]
-  q = q[cols].groupby("netid").apply(lambda d: d.iloc[d["q-days"].argmax()]).sort_values("q-days", ascending=False)[:10]
-  s += q.to_string(index=False, justify="center")
+  s += excessive_queue_times(raw).to_string(index=False, justify="center")
 
   if email:
     send_email(s, "halverson@princeton.edu")
