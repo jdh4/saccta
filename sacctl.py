@@ -1,5 +1,7 @@
 #!/usr/licensed/anaconda3/2021.5/bin/python
 
+# github url
+
 import os
 import time
 import subprocess
@@ -39,8 +41,11 @@ def get_raw_dataframe(start_date):
     if lines != [] and lines[-1] == "": lines = lines[:-1]
     df = pd.DataFrame([line.split("|") for line in lines])
     df.columns = fields.split(",")
-    df.rename(columns={"user":"netid", "cputimeraw":"cpu-seconds", "nnodes":"nodes", "ncpus":"cores", "timelimitraw":"limit-minutes"}, inplace=True)
-    df = df[~df.cluster.isin(["tukey", "perseus"])]
+    d = {"user":"netid", "cputimeraw":"cpu-seconds", "nnodes":"nodes", "ncpus":"cores", "timelimitraw":"limit-minutes"}
+    df.rename(columns=d, inplace=True)
+    df = df[~df.cluster.isin(("tukey", "perseus"))]
+    cols = ["cpu-seconds", "elapsedraw", "limit-minutes", "nodes", "cores", "submit", "eligible"]
+    df[cols] = df[cols].apply(pd.to_numeric)
     df.to_csv(fname, index=False)
   df = pd.read_csv(fname, low_memory=False)
   return df
@@ -65,29 +70,29 @@ def unused_allocated_hours_of_completed(df):
           (df.state == "COMPLETED") & \
           (df["elapsed-hours"] >= 2) & \
           (df.partition.isin(partitions))].copy()
-  wh["mratio"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
+  wh["ratio"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
   d = {f"{xpu}-waste-hours":np.sum, f"{xpu}-alloc-hours":np.sum, f"{xpu}-hours":np.sum, "netid":np.size, \
-       "partition":lambda series: ",".join(sorted(set(series))), "mratio":"median"}
-  wh = wh.groupby("netid").agg(d).rename(columns={"netid":"jobs"})
+       "partition":lambda series: ",".join(sorted(set(series))), "ratio":"median"}
+  wh = wh.groupby("netid").agg(d).rename(columns={"netid":"jobs", "ratio":"median(%)"})
   wh = wh.sort_values(by=f"{xpu}-hours", ascending=False).reset_index(drop=False)
   wh["rank"] = wh.index + 1
-  wh = wh.sort_values(by=f"{xpu}-waste-hours", ascending=False)
+  wh = wh.sort_values(by=f"{xpu}-waste-hours", ascending=False).reset_index(drop=False)
   wh = wh[:5]
+  wh.index += 1
   wh[f"{xpu}-hours"] = wh[f"{xpu}-hours"].apply(round).astype("int64")
   wh["ratio(%)"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
   wh["ratio(%)"] = wh["ratio(%)"].apply(round).astype("int64")
-  wh["mratio"] = wh["mratio"].apply(round).astype("int64")
-  wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-alloc-hours", f"{xpu}-hours", "ratio(%)", "mratio", "rank", "jobs", "partition"]]
-  return wh.rename(columns={"mratio":"median(%)"})
+  wh["median(%)"] = wh["median(%)"].apply(round).astype("int64")
+  wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-hours", f"{xpu}-alloc-hours", "ratio(%)", "median(%)", "rank", "jobs", "partition"]]
+  return wh.rename(columns={f"{xpu}-waste-hours":"unused", f"{xpu}-hours":"used", f"{xpu}-alloc-hours":"total"})
 
 def excessive_queue_times(raw):
   # sacct does not return queued jobs with a NODELIST(REASON) of (Dependency) or (JobHeldUser)
   # below we use submit instead of eligible to compute the queued time
-  #raw.state = raw.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
   q = raw[raw.state == "PENDING"].copy()
   q["q-days"] = round((time.time() - q["submit"]) / seconds_per_hour / hours_per_day)
   q["q-days"] = q["q-days"].astype("int64")
-  cols = ["jobid", "cluster", "netid", "q-days"]
+  cols = ["jobid", "netid", "cluster", "cores", "qos", "partition", "q-days"]
   q = q[cols].groupby("netid").apply(lambda d: d.iloc[d["q-days"].argmax()]).sort_values("q-days", ascending=False)[:10]
   return q
 
@@ -110,38 +115,7 @@ def jobs_with_the_most_gpus(df):
   g = g.sort_values("gpus", ascending=False)[:10].sort_values("start", ascending=False).drop(columns=["start"])
   return g
 
-
-if __name__ == "__main__":
-
-  email = True
-  num_days_ago = 14
-
-  # pandas display settings
-  pd.set_option('display.max_rows', None)
-  pd.set_option('display.max_columns', None)
-  pd.set_option('display.width', 1000)
-
-  # convert Slurm timestamps to seconds
-  os.environ['SLURM_TIME_FORMAT'] = "%s"
-
-  # conversion factors
-  seconds_per_minute = 60
-  seconds_per_hour = 3600
-  hours_per_day = 24
-
-  start_date = datetime.now() - timedelta(num_days_ago)
-  df = get_raw_dataframe(f"{start_date.strftime('%Y-%m-%d')}T00:00:00")
-  raw = df.copy()
-  df = df[pd.notnull(df.alloctres)]
-  df.state = df.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
-  df.cluster  =  df.cluster.str.replace("tiger2", "tiger")
-  raw.cluster = raw.cluster.str.replace("tiger2", "tiger")
-
-  if not email:
-    df.info()
-    print(df.describe())
-    print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
-
+def add_new_and_derived_fields(df):
   # new and derived fields
   df["gpus"] = df.alloctres.apply(gpus_per_job)
   df["gpu-seconds"] = df.apply(lambda row: row["elapsedraw"] * row["gpus"], axis='columns')
@@ -155,6 +129,42 @@ if __name__ == "__main__":
   df["gpu-alloc-hours"] = df.apply(lambda row: round(row["limit-minutes"] * seconds_per_minute * row["gpus"]  / seconds_per_hour), axis="columns")
   df["cpu-hours"] = df["cpu-seconds"] / seconds_per_hour
   df["gpu-hours"] = df["gpu-seconds"] / seconds_per_hour
+  return df
+
+
+if __name__ == "__main__":
+
+  email = False
+  debug = False
+  num_days_ago = 7
+
+  # pandas display settings
+  pd.set_option("display.max_rows", None)
+  pd.set_option("display.max_columns", None)
+  pd.set_option("display.width", 1000)
+
+  # convert Slurm timestamps to seconds
+  os.environ["SLURM_TIME_FORMAT"] = "%s"
+
+  # conversion factors
+  seconds_per_minute = 60
+  seconds_per_hour = 3600
+  hours_per_day = 24
+
+  start_date = datetime.now() - timedelta(num_days_ago)
+  df = get_raw_dataframe(f"{start_date.strftime('%Y-%m-%d')}T00:00:00")
+  raw = df.copy()
+  df = df[pd.notnull(df.alloctres)]
+  df = add_new_and_derived_fields(df)
+  df.state = df.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
+  df.cluster  =  df.cluster.str.replace("tiger2", "tiger")
+  raw.cluster = raw.cluster.str.replace("tiger2", "tiger")
+  raw.partition = raw.partition.str.replace("datascience", "datasci")
+
+  if debug:
+    df.info()
+    print(df.describe())
+    print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
 
   # header
   fmt = "%a %b %-d"
@@ -165,37 +175,37 @@ if __name__ == "__main__":
   #####################################
   #### used allocated cpu/gpu hours ###
   #####################################
-  cls = (("della", ("cpu", "datascience", "physics"), "cpu"), \
-         ("della", ("gpu",), "gpu"), \
-         ("stellar", ("all", "pppl", "pu", "serial"), "cpu"), \
-         ("stellar", ("bigmem", "cimes"), "cpu"), \
-         ("tiger", ("cpu", "ext", "serial"), "cpu"), \
-         ("tiger", ("gpu",), "gpu"), \
-         ("traverse", ("all",), "gpu"))
-  s += "========= Unused allocated CPU/GPU-Hours (of completed and 2+ hour jobs) =========\n"
-  for cluster, partitions, xpu in cls:
-    s += f"{cluster.upper()}\n"
-    s += unused_allocated_hours_of_completed(df).to_string(index=False, justify="center")
-    s += "\n\n\n"
+  cls = (("della", "Della (CPU)", ("cpu", "datascience", "physics"), "cpu"), \
+         ("della", "Della (GPU)", ("gpu",), "gpu"), \
+         ("stellar", "Stellar (AMD)", ("bigmem", "cimes"), "cpu"), \
+         ("stellar", "Stellar (Intel)", ("all", "pppl", "pu", "serial"), "cpu"), \
+         ("tiger", "TigerCPU", ("cpu", "ext", "serial"), "cpu"), \
+         ("tiger", "TigerGPU", ("gpu",), "gpu"), \
+         ("traverse", "Traverse (GPU)", ("all",), "gpu"))
+  s += "========= Unused allocated CPU/GPU-Hours (of COMPLETED 2+ hour jobs) =========\n"
+  for cluster, name, partitions, xpu in cls:
+    s += f"{name}\n"
+    s += unused_allocated_hours_of_completed(df).to_string(index=True, justify="center")
+    s += "\n\n"
 
   ######################
   #### fragmentation ###
   ######################
-  s += "\n\n\n========= Multinode CPU jobs with 1 core per node (all jobs): =========\n"
+  s += "\n== Multinode CPU jobs with 1 core per node (all jobs, 2+ hours) ==\n"
   s += multinode_with_one_core_per_node(df).to_string(index=False, justify="center")
-  s += "\n\n\n========= Multinode GPU jobs with 1 GPU per node (all jobs) =========\n"
+  s += "\n\n\n== Multinode GPU jobs with 1 GPU per node (all jobs, 2+ hours) ==\n"
   s += multinode_with_one_gpu_per_node(df).to_string(index=False, justify="center")
 
   #######################
   #### large gpu jobs ###
   #######################
-  s += "\n\n\n======== Jobs with the most GPUs (1 job per user): ========\n"
+  s += "\n\n\n=========== Jobs with the most GPUs (1 job per user) ===========\n"
   s += jobs_with_the_most_gpus(df).to_string(index=False, justify="center")
 
   ##############################
   #### excessive queue times ###
   ##############################
-  s += "\n\n\n========== Excessive queue times (1 job per user) ==========\n"
+  s += "\n\n\n================== Excessive queue times (1 job per user) ==================\n"
   s += excessive_queue_times(raw).to_string(index=False, justify="center")
 
   if email:
