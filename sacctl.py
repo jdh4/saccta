@@ -2,6 +2,7 @@
 
 # github url
 
+import argparse
 import os
 import time
 import subprocess
@@ -103,7 +104,7 @@ def add_new_and_derived_fields(df):
   df["gpu-hours"] = df["gpu-seconds"] / seconds_per_hour
   return df
 
-def unused_allocated_hours_of_completed(df):
+def unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu):
   wh = df[(df.cluster == cluster) & \
           (df.state == "COMPLETED") & \
           (df["elapsed-hours"] >= 2) & \
@@ -124,13 +125,14 @@ def unused_allocated_hours_of_completed(df):
   wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-hours", f"{xpu}-alloc-hours", "ratio(%)", "median(%)", "rank", "jobs", "partition"]]
   return wh.rename(columns={f"{xpu}-waste-hours":"unused", f"{xpu}-hours":"used", f"{xpu}-alloc-hours":"total"})
 
-def multinode_with_one_core_per_node(df):
-  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "elapsed-hours", "start-date", "start"]
+def multinode_cpu_fragmentation(df):
+  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "state", "elapsed-hours", "start-date", "start"]
   m = df[(df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.cores / df.nodes < 14)][cols]
   m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"])
+  m.state = m.state.apply(lambda x: states[x])
   return m
 
-def multinode_with_one_gpu_per_node(df):
+def multinode_gpu_fragmentation(df):
   cols = ["jobid", "netid", "cluster", "nodes", "gpus", "state", "elapsed-hours", "start-date", "start"]
   cond1 = (df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.gpus > 0) & (df.nodes == df.gpus)
   cond2 = (df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.gpus > 0) & (df.cluster.isin(["tiger", "traverse"])) & (df.gpus < 4 * df.nodes)
@@ -147,7 +149,7 @@ def jobs_with_the_most_gpus(df):
   g.state = g.state.apply(lambda x: states[x])
   return g
 
-def excessive_queue_times(raw):
+def longest_queue_times(raw):
   # below we use submit instead of eligible to compute the queue time
   q = raw[raw.state == "PENDING"].copy()
   q["q-days"] = round((time.time() - q["submit"]) / seconds_per_hour / hours_per_day)
@@ -159,8 +161,12 @@ def excessive_queue_times(raw):
 
 if __name__ == "__main__":
 
-  email = False
-  num_days_ago = 14
+  parser = argparse.ArgumentParser(description='Slurm job alerts')
+  parser.add_argument('--days', type=int, default=14, metavar='N',
+                      help='Create report over this many previous days from now (default: 14)')
+  parser.add_argument('--email', action='store_true', default=False,
+                      help='Send output via email')
+  args = parser.parse_args()
 
   # pandas display settings
   pd.set_option("display.max_rows", None)
@@ -171,11 +177,11 @@ if __name__ == "__main__":
   os.environ["SLURM_TIME_FORMAT"] = "%s"
 
   flags = "-L -a -X -P -n"
-  start_date = datetime.now() - timedelta(num_days_ago)
+  start_date = datetime.now() - timedelta(days=args.days)
   fields = "jobid,user,cluster,account,partition,cputimeraw,elapsedraw,timelimitraw,nnodes,ncpus,alloctres,submit,eligible,start,qos,state"
   renamings = {"user":"netid", "cputimeraw":"cpu-seconds", "nnodes":"nodes", "ncpus":"cores", "timelimitraw":"limit-minutes"}
   numeric_fields = ["cpu-seconds", "elapsedraw", "limit-minutes", "nodes", "cores", "submit", "eligible"]
-  raw = raw_dataframe_from_sacct(flags, start_date, fields, renamings, numeric_fields, use_cache=not email)
+  raw = raw_dataframe_from_sacct(flags, start_date, fields, renamings, numeric_fields, use_cache=not args.email)
 
   raw = raw[~raw.cluster.isin(["tukey", "perseus"])]
   raw.cluster = raw.cluster.str.replace("tiger2", "tiger")
@@ -186,10 +192,9 @@ if __name__ == "__main__":
   df = raw.copy()
   df = df[pd.notnull(df.alloctres) & (df.alloctres != "")]
   df.start = df.start.astype("int64")
-  df = df[df.start >= time.time() - 7 * hours_per_day * seconds_per_hour]
   df = add_new_and_derived_fields(df)
 
-  if not email:
+  if not args.email:
     df.info()
     print(df.describe())
     print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
@@ -213,16 +218,20 @@ if __name__ == "__main__":
   s += "========= Unused allocated CPU/GPU-Hours (of COMPLETED 2+ hour jobs) =========\n"
   for cluster, name, partitions, xpu in cls:
     s += f"{name}\n"
-    s += unused_allocated_hours_of_completed(df).to_string(index=True, justify="center")
+    u = unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu)
+    s += u.to_string(index=True, justify="center")
     s += "\n\n"
+
+  ####### consider jobs in the last 5 days only #######
+  df = df[df.start >= time.time() - 5 * hours_per_day * seconds_per_hour]
 
   ######################
   #### fragmentation ###
   ######################
-  s += "\n== Multinode CPU jobs with < 14 cores per node (all jobs, 2+ hours) ==\n"
-  s += multinode_with_one_core_per_node(df).to_string(index=False, justify="center")
+  s += "\n===== Multinode CPU jobs with < 14 cores per node (all jobs, 2+ hours) =====\n"
+  s += multinode_cpu_fragmentation(df).to_string(index=False, justify="center")
   s += "\n\n\n===== Multinode GPU jobs with fragmentation (all jobs, 2+ hours) =====\n"
-  s += multinode_with_one_gpu_per_node(df).to_string(index=False, justify="center")
+  s += multinode_gpu_fragmentation(df).to_string(index=False, justify="center")
 
   #######################
   #### large gpu jobs ###
@@ -231,12 +240,9 @@ if __name__ == "__main__":
   s += jobs_with_the_most_gpus(df).to_string(index=False, justify="center")
 
   ##############################
-  #### excessive queue times ###
+  #### longest queue times ###
   ##############################
-  s += "\n\n\n========== Longest queue times of PENDING jobs (1 job per user) ==========\n"
-  s += excessive_queue_times(raw).to_string(index=False, justify="center")
+  s += "\n\n\n====== Longest queue times of currently PENDING jobs (1 job per user) ======\n"
+  s += longest_queue_times(raw).to_string(index=False, justify="center")
 
-  if email:
-    send_email(s, "halverson@princeton.edu")
-  else:
-    print(s)
+  send_email(s, "halverson@princeton.edu") if args.email else print(s)
