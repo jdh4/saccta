@@ -821,18 +821,18 @@ if host != "adroit":
 # F O R M A T T I N G
 ########################
 
-def shorten(x):
-  if len(x) > 18:
-    first, last = x.split()
+def shorten(name):
+  if len(name) > 18:
+    first, last = name.split()
     return f"{first[0]}. {last}"
   else:
-    return x
+    return name
 
 def format_user(s):
   if not s: return s
   names = list(filter(lambda x: x not in ['Jr.', 'II', 'III', 'IV'], s.split()))
-  if len(names) <= 2:
-    return shorten(" ".join(names))
+  if len(names) == 1:
+    return names[0]
   else:
     return shorten(f"{names[0]} {names[-1]}")
 
