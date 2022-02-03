@@ -1,6 +1,7 @@
 #!/usr/licensed/anaconda3/2021.5/bin/python
 
-# github url
+# version control
+# https://github.com/jdh4/saccta/blob/main/sacctl.py
 
 import argparse
 import os
@@ -62,7 +63,7 @@ def raw_dataframe_from_sacct(flags, start_date, fields, renamings=[], numeric_fi
   else:
     cmd = f"sacct {flags} -S {start_date.strftime('%Y-%m-%d')}T00:00:00 -E now -o {fields}"
     if use_cache: print("\nCalling sacct (which may require several seconds) ... ", end="", flush=True)
-    output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=60, text=True, check=True)
+    output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=120, text=True, check=True)
     if use_cache: print("done.", flush=True)
     lines = output.stdout.split('\n')
     if lines != [] and lines[-1] == "": lines = lines[:-1]
@@ -94,7 +95,7 @@ def add_new_and_derived_fields(df):
   df["gpu-seconds"] = df.apply(lambda row: row["elapsedraw"] * row["gpus"], axis='columns')
   df["gpu-job"] = df.alloctres.apply(is_gpu_job)
   df["cpu-only-seconds"] = df.apply(lambda row: 0 if row["gpus"] else row["cpu-seconds"], axis="columns")
-  df["elapsed-hours"] = df.elapsedraw.apply(lambda x: round(x / SECONDS_PER_HOUR, 1))
+  df["elapsed-hours"] = df.elapsedraw.apply(lambda x: round(x / SECONDS_PER_HOUR))
   df["start-date"] = df.start.apply(lambda x: x if x == "Unknown" else datetime.fromtimestamp(int(x)).strftime("%a %-m/%-d"))
   df["cpu-waste-hours"] = df.apply(lambda row: round((row["limit-minutes"] * SECONDS_PER_MINUTE - row["elapsedraw"]) * row["cores"] / SECONDS_PER_HOUR), axis="columns")
   df["gpu-waste-hours"] = df.apply(lambda row: round((row["limit-minutes"] * SECONDS_PER_MINUTE - row["elapsedraw"]) * row["gpus"]  / SECONDS_PER_HOUR), axis="columns")
@@ -126,26 +127,26 @@ def unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu):
   return wh.rename(columns={f"{xpu}-waste-hours":"unused", f"{xpu}-hours":"used", f"{xpu}-alloc-hours":"total"})
 
 def multinode_cpu_fragmentation(df):
-  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "state", "elapsed-hours", "start-date", "start"]
-  m = df[(df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.cores / df.nodes < 14)][cols]
-  m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"])
+  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "state", "partition", "elapsed-hours", "start-date", "start"]
+  m = df[(df["elapsed-hours"] >= 2) & (df.nodes > 1) & (df.cores / df.nodes < 14)][cols]
+  m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   m.state = m.state.apply(lambda x: JOBSTATES[x])
   return m
 
 def multinode_gpu_fragmentation(df):
-  cols = ["jobid", "netid", "cluster", "nodes", "gpus", "state", "elapsed-hours", "start-date", "start"]
-  cond1 = (df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.gpus > 0) & (df.nodes == df.gpus)
-  cond2 = (df["elapsed-hours"] > 2) & (df.nodes > 1) & (df.gpus > 0) & (df.cluster.isin(["tiger", "traverse"])) & (df.gpus < 4 * df.nodes)
+  cols = ["jobid", "netid", "cluster", "nodes", "gpus", "state", "partition", "elapsed-hours", "start-date", "start"]
+  cond1 = (df["elapsed-hours"] >= 2) & (df.nodes > 1) & (df.gpus > 0) & (df.nodes == df.gpus)
+  cond2 = (df["elapsed-hours"] >= 2) & (df.nodes > 1) & (df.gpus > 0) & (df.cluster.isin(["tiger", "traverse"])) & (df.gpus < 4 * df.nodes)
   m = df[cond1 | cond2][cols]
   m.state = m.state.apply(lambda x: JOBSTATES[x])
-  m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"])
+  m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   return m
 
 def jobs_with_the_most_gpus(df):
   """Top 10 users with the highest number of GPUs in a job. Only one job per user is shown."""
-  cols = ["jobid", "netid", "cluster", "gpus", "nodes", "state", "elapsed-hours", "start-date", "start"]
+  cols = ["jobid", "netid", "cluster", "gpus", "nodes", "state", "partition", "elapsed-hours", "start-date", "start"]
   g = df[cols].groupby("netid").apply(lambda d: d.iloc[d["gpus"].argmax()])
-  g = g.sort_values("gpus", ascending=False)[:10].drop(columns=["start"])
+  g = g.sort_values("gpus", ascending=False)[:10].drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   g.state = g.state.apply(lambda x: JOBSTATES[x])
   return g
 
@@ -186,6 +187,7 @@ if __name__ == "__main__":
   raw = raw[~raw.cluster.isin(["tukey", "perseus"])]
   raw.cluster = raw.cluster.str.replace("tiger2", "tiger")
   raw.partition = raw.partition.str.replace("datascience", "datasci")
+  raw.partition = raw.partition.str.replace("physics", "phys")
   raw.state = raw.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
 
   # df excludes pending jobs
