@@ -224,8 +224,8 @@ if __name__ == "__main__":
     s += u.to_string(index=True, justify="center")
     s += "\n\n"
 
-  ####### consider jobs in the last 5 days only #######
-  df = df[df.start >= time.time() - 5 * HOURS_PER_DAY * SECONDS_PER_HOUR]
+  ####### consider jobs in the last 3 days only #######
+  df = df[df.start >= time.time() - 3 * HOURS_PER_DAY * SECONDS_PER_HOUR]
 
   ######################
   #### fragmentation ###
