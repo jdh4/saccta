@@ -1,11 +1,7 @@
-#!/usr/licensed/anaconda3/2021.5/bin/python
-
-# version control
-# https://github.com/jdh4/saccta/blob/main/sacctl.py
-
 import argparse
 import os
 import time
+import math
 import subprocess
 from datetime import datetime
 from datetime import timedelta
@@ -21,7 +17,7 @@ SECONDS_PER_MINUTE = 60
 SECONDS_PER_HOUR = 3600
 HOURS_PER_DAY = 24
 
-# job states
+# slurm job states
 states = {
   'BF'  :'BOOT_FAIL',
   'CLD' :'CANCELLED',
@@ -120,15 +116,16 @@ def unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu):
   wh = wh[:5]
   wh.index += 1
   wh[f"{xpu}-hours"] = wh[f"{xpu}-hours"].apply(round).astype("int64")
-  wh["ratio(%)"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
-  wh["ratio(%)"] = wh["ratio(%)"].apply(round).astype("int64")
+  wh["mean(%)"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
+  wh["mean(%)"] = wh["mean(%)"].apply(round).astype("int64")
   wh["median(%)"] = wh["median(%)"].apply(round).astype("int64")
-  wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-hours", f"{xpu}-alloc-hours", "ratio(%)", "median(%)", "rank", "jobs", "partition"]]
+  wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-hours", f"{xpu}-alloc-hours", "mean(%)", "median(%)", "rank", "jobs", "partition"]]
   return wh.rename(columns={f"{xpu}-waste-hours":"unused", f"{xpu}-hours":"used", f"{xpu}-alloc-hours":"total"})
 
 def multinode_cpu_fragmentation(df):
-  cols = ["jobid", "netid", "cluster", "nodes", "cores", "gpus", "state", "partition", "elapsed-hours", "start-date", "start"]
-  m = df[(df["elapsed-hours"] >= 2) & (df.nodes > 1) & (df.cores / df.nodes < 14)][cols]
+  cols = ["jobid", "netid", "cluster", "nodes", "cores", "state", "partition", "elapsed-hours", "start-date", "start"]
+  cond = (df["elapsed-hours"] >= 2) & (df.nodes > 1) & (df.cores / df.nodes < 14) & (df.gpus == 0)
+  m = df[cond][cols]
   m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   m.state = m.state.apply(lambda x: JOBSTATES[x])
   return m
@@ -142,9 +139,17 @@ def multinode_gpu_fragmentation(df):
   m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   return m
 
+def jobs_with_the_most_cores(df):
+  """Top 10 users with the highest number of CPU-cores in a job. Only one job per user is shown."""
+  cols = ["jobid", "netid", "cluster", "cores", "nodes", "gpus", "state", "partition", "elapsed-hours", "start-date", "start"]
+  c = df[cols].groupby("netid").apply(lambda d: d.iloc[d["cores"].argmax()])
+  c = c.sort_values("cores", ascending=False)[:10].drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
+  c.state = c.state.apply(lambda x: JOBSTATES[x])
+  return c
+
 def jobs_with_the_most_gpus(df):
   """Top 10 users with the highest number of GPUs in a job. Only one job per user is shown."""
-  cols = ["jobid", "netid", "cluster", "gpus", "nodes", "state", "partition", "elapsed-hours", "start-date", "start"]
+  cols = ["jobid", "netid", "cluster", "gpus", "nodes", "cores", "state", "partition", "elapsed-hours", "start-date", "start"]
   g = df[cols].groupby("netid").apply(lambda d: d.iloc[d["gpus"].argmax()])
   g = g.sort_values("gpus", ascending=False)[:10].drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   g.state = g.state.apply(lambda x: JOBSTATES[x])
@@ -158,6 +163,20 @@ def longest_queue_times(raw):
   cols = ["jobid", "netid", "cluster", "cores", "qos", "partition", "q-days"]
   q = q[cols].groupby("netid").apply(lambda d: d.iloc[d["q-days"].argmax()]).sort_values("q-days", ascending=False)[:10]
   return q
+
+def add_dividers(df, title="", pre="\n\n\n"):
+  rows = df.split("\n")
+  width = max([len(row) for row in rows])
+  padding = " " * max(1, math.ceil((width - len(title)) / 2))
+  divider = padding + title + padding
+  if bool(title): 
+    rows.insert(0, divider)
+    rows.insert(1, "-" * len(divider))
+    rows.insert(3, "-" * len(divider))
+  else:
+    rows.insert(0, "-" * len(divider))
+    rows.insert(2, "-" * len(divider))
+  return pre + "\n".join(rows)
 
 
 if __name__ == "__main__":
@@ -174,7 +193,7 @@ if __name__ == "__main__":
   pd.set_option("display.max_columns", None)
   pd.set_option("display.width", 1000)
 
-  # convert Slurm timestamps to seconds
+  # convert slurm timestamps to seconds
   os.environ["SLURM_TIME_FORMAT"] = "%s"
 
   flags = "-L -a -X -P -n"
@@ -185,7 +204,7 @@ if __name__ == "__main__":
   raw = raw_dataframe_from_sacct(flags, start_date, fields, renamings, numeric_fields, use_cache=not args.email)
 
   raw = raw[~raw.cluster.isin(["tukey", "perseus"])]
-  raw.cluster = raw.cluster.str.replace("tiger2", "tiger")
+  raw.cluster   =   raw.cluster.str.replace("tiger2", "tiger")
   raw.partition = raw.partition.str.replace("datascience", "datasci")
   raw.partition = raw.partition.str.replace("physics", "phys")
   raw.state = raw.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
@@ -203,13 +222,13 @@ if __name__ == "__main__":
 
   # header
   fmt = "%a %b %-d"
-  s = f"{start_date.strftime(fmt)} -- {datetime.now().strftime(fmt)}\n\n"
+  s = f"{start_date.strftime(fmt)} - {datetime.now().strftime(fmt)}\n\n"
   s += f"Total users: {raw.netid.unique().size}\n"
   s += f"Total jobs:  {raw.shape[0]}\n\n"
 
-  #####################################
-  #### used allocated cpu/gpu hours ###
-  #####################################
+  ####################################
+  ### used allocated cpu/gpu hours ###
+  ####################################
   cls = (("della", "Della (CPU)", ("cpu", "datascience", "physics"), "cpu"), \
          ("della", "Della (GPU)", ("gpu",), "gpu"), \
          ("stellar", "Stellar (AMD)", ("bigmem", "cimes"), "cpu"), \
@@ -217,34 +236,34 @@ if __name__ == "__main__":
          ("tiger", "TigerCPU", ("cpu", "ext", "serial"), "cpu"), \
          ("tiger", "TigerGPU", ("gpu",), "gpu"), \
          ("traverse", "Traverse (GPU)", ("all",), "gpu"))
-  s += "========= Unused allocated CPU/GPU-Hours (of COMPLETED 2+ hour jobs) =========\n"
+  s += "           Unused allocated CPU/GPU-Hours (of COMPLETED 2+ hour jobs)"
   for cluster, name, partitions, xpu in cls:
-    s += f"{name}\n"
-    u = unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu)
-    s += u.to_string(index=True, justify="center")
-    s += "\n\n"
+    df_str = unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu).to_string(index=True, justify="center")
+    s += add_dividers(df_str, title=name, pre="\n\n")
 
   ####### consider jobs in the last 3 days only #######
   df = df[df.start >= time.time() - 3 * HOURS_PER_DAY * SECONDS_PER_HOUR]
 
-  ######################
-  #### fragmentation ###
-  ######################
-  s += "\n===== Multinode CPU jobs with < 14 cores per node (all jobs, 2+ hours) =====\n"
-  s += multinode_cpu_fragmentation(df).to_string(index=False, justify="center")
-  s += "\n\n\n===== Multinode GPU jobs with fragmentation (all jobs, 2+ hours) =====\n"
-  s += multinode_gpu_fragmentation(df).to_string(index=False, justify="center")
+  #####################
+  ### fragmentation ###
+  #####################
+  df_str = multinode_cpu_fragmentation(df).to_string(index=False, justify="center")
+  s += add_dividers(df_str, title="Multinode CPU jobs with < 14 cores per node (all jobs, 2+ hours)", pre="\n\n\n\n")
+  df_str = multinode_gpu_fragmentation(df).to_string(index=False, justify="center")
+  s += add_dividers(df_str, title="Multinode GPU jobs with fragmentation (all jobs, 2+ hours)")
 
-  #######################
-  #### large gpu jobs ###
-  #######################
-  s += "\n\n\n============== Jobs with the most GPUs (1 job per user) ==============\n"
-  s += jobs_with_the_most_gpus(df).to_string(index=False, justify="center")
+  ######################
+  ### large gpu jobs ###
+  ######################
+  df_str = jobs_with_the_most_cores(df).to_string(index=False, justify="center")
+  s += add_dividers(df_str, title="Jobs with the most CPU-cores (1 job per user)")
+  df_str = jobs_with_the_most_gpus(df).to_string(index=False, justify="center")
+  s += add_dividers(df_str, title="Jobs with the most GPUs (1 job per user)")
 
-  ##############################
-  #### longest queue times ###
-  ##############################
-  s += "\n\n\n====== Longest queue times of currently PENDING jobs (1 job per user) ======\n"
-  s += longest_queue_times(raw).to_string(index=False, justify="center")
+  ###########################
+  ### longest queue times ###
+  ###########################
+  df_str = longest_queue_times(raw).to_string(index=False, justify="center")
+  s += add_dividers(df_str, title="Longest queue times of currently PENDING jobs (1 job per user)")
 
   send_email(s, "halverson@princeton.edu") if args.email else print(s)
