@@ -23,4 +23,4 @@ Combination:
 1337
 ```
 
-The comprehensive report in PDF cited 1253.
+The comprehensive report in PDF cited 1253. 463 were found on Adroit in that document.
