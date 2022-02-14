@@ -22,3 +22,5 @@ Combination:
 [jdh4@della8 ~] $ cat adroit.txt large_clusters.txt | sort | uniq | wc -l
 1337
 ```
+
+The comprehensive report in PDF cited 1253.
