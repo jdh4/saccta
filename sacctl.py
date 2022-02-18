@@ -101,7 +101,7 @@ def add_new_and_derived_fields(df):
   df["gpu-hours"] = df["gpu-seconds"] / SECONDS_PER_HOUR
   return df
 
-def unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu):
+def unused_allocated_hours_of_completed(df, cluster, partitions, xpu):
   wh = df[(df.cluster == cluster) & \
           (df.state == "COMPLETED") & \
           (df["elapsed-hours"] >= 2) & \
@@ -119,6 +119,8 @@ def unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu):
   wh["mean(%)"] = 100 * wh[f"{xpu}-hours"] / wh[f"{xpu}-alloc-hours"]
   wh["mean(%)"] = wh["mean(%)"].apply(round).astype("int64")
   wh["median(%)"] = wh["median(%)"].apply(round).astype("int64")
+  # apply filter
+  wh = wh[(wh["mean(%)"] < 20) & (wh["median(%)"] < 20)]
   wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-hours", f"{xpu}-alloc-hours", "mean(%)", "median(%)", "rank", "jobs", "partition"]]
   return wh.rename(columns={f"{xpu}-waste-hours":"unused", f"{xpu}-hours":"used", f"{xpu}-alloc-hours":"total"})
 
@@ -238,8 +240,10 @@ if __name__ == "__main__":
          ("traverse", "Traverse (GPU)", ("all",), "gpu"))
   s += "           Unused allocated CPU/GPU-Hours (of COMPLETED 2+ hour jobs)"
   for cluster, name, partitions, xpu in cls:
-    df_str = unused_allocated_hours_of_completed(df, cluster, name, partitions, xpu).to_string(index=True, justify="center")
-    s += add_dividers(df_str, title=name, pre="\n\n")
+    un = unused_allocated_hours_of_completed(df, cluster, partitions, xpu)
+    if not un.empty:
+      df_str = un.to_string(index=True, justify="center")
+      s += add_dividers(df_str, title=name, pre="\n\n")
 
   ####### consider jobs in the last 3 days only #######
   df = df[df.start >= time.time() - 3 * HOURS_PER_DAY * SECONDS_PER_HOUR]
@@ -247,10 +251,15 @@ if __name__ == "__main__":
   #####################
   ### fragmentation ###
   #####################
-  df_str = multinode_cpu_fragmentation(df).to_string(index=False, justify="center")
-  s += add_dividers(df_str, title="Multinode CPU jobs with < 14 cores per node (all jobs, 2+ hours)", pre="\n\n\n\n")
-  df_str = multinode_gpu_fragmentation(df).to_string(index=False, justify="center")
-  s += add_dividers(df_str, title="Multinode GPU jobs with fragmentation (all jobs, 2+ hours)")
+  fg = multinode_cpu_fragmentation(df)
+  if not fg.empty:
+    df_str = fg.to_string(index=False, justify="center")
+    s += add_dividers(df_str, title="Multinode CPU jobs with < 14 cores per node (all jobs, 2+ hours)", pre="\n\n\n\n")
+    
+  fg = multinode_gpu_fragmentation(df)
+  if not fg.empty:
+    df_str = fg.to_string(index=False, justify="center")
+    s += add_dividers(df_str, title="Multinode GPU jobs with fragmentation (all jobs, 2+ hours)")
 
   ######################
   ### large gpu jobs ###
