@@ -120,7 +120,7 @@ def unused_allocated_hours_of_completed(df, cluster, partitions, xpu):
   wh["mean(%)"] = wh["mean(%)"].apply(round).astype("int64")
   wh["median(%)"] = wh["median(%)"].apply(round).astype("int64")
   # apply filter
-  wh = wh[(wh["mean(%)"] < 20) & (wh["median(%)"] < 20)]
+  wh = wh[(wh["mean(%)"] < 20) & (wh["median(%)"] < 20) & (wh["rank"] < 10)]
   wh = wh[["netid", f"{xpu}-waste-hours", f"{xpu}-hours", f"{xpu}-alloc-hours", "mean(%)", "median(%)", "rank", "jobs", "partition"]]
   return wh.rename(columns={f"{xpu}-waste-hours":"unused", f"{xpu}-hours":"used", f"{xpu}-alloc-hours":"total"})
 
