@@ -160,9 +160,11 @@ def jobs_with_the_most_gpus(df):
 def longest_queue_times(raw):
   # below we use submit instead of eligible to compute the queue time
   q = raw[raw.state == "PENDING"].copy()
-  q["q-days"] = round((time.time() - q["submit"]) / SECONDS_PER_HOUR / HOURS_PER_DAY)
+  q["q-days"] = round((time.time() - q["submit"])   / SECONDS_PER_HOUR / HOURS_PER_DAY)
+  q["e-days"] = round((time.time() - q["eligible"]) / SECONDS_PER_HOUR / HOURS_PER_DAY)
   q["q-days"] = q["q-days"].astype("int64")
-  cols = ["jobid", "netid", "cluster", "cores", "qos", "partition", "q-days"]
+  q["e-days"] = q["e-days"].astype("int64")
+  cols = ["jobid", "netid", "cluster", "cores", "qos", "partition", "q-days", "e-days"]
   q = q[cols].groupby("netid").apply(lambda d: d.iloc[d["q-days"].argmax()]).sort_values("q-days", ascending=False)[:10]
   return q
 
