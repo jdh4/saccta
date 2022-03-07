@@ -141,6 +141,20 @@ def multinode_gpu_fragmentation(df):
   m = m.sort_values(["netid", "start"], ascending=[True, False]).drop(columns=["start"]).rename(columns={"elapsed-hours":"hours"})
   return m
 
+def recent_jobs_all_failures(df):
+  """All jobs failed on the last day that the user ran."""
+  cols = ["netid", "cluster", "state", "start", "end"]
+  f = df[cols][df.start != "Unknown"].copy()
+  # next line deals with RUNNING jobs
+  f["end"] = f["end"].str.replace("Unknown", str(round(time.time())), regex=False)
+  f["end"] = f["end"].astype("int64")
+  f["day-since-epoch"] = f["end"].apply(lambda x: round(int(x) / SECONDS_PER_HOUR / HOURS_PER_DAY))
+  d = {"netid":np.size, "state":lambda series: sum([s == "FAILED" for s in series])}
+  f = f.groupby(["netid", "cluster", "day-since-epoch"]).agg(d).rename(columns={"netid":"jobs", "state":"num-failed"}).reset_index()
+  f = f.groupby(["netid", "cluster"]).apply(lambda d: d.iloc[d["day-since-epoch"].argmax()])
+  f = f[(f["num-failed"] == f["jobs"]) & (f["num-failed"] > 3)]
+  return f
+
 def jobs_with_the_most_cores(df):
   """Top 10 users with the highest number of CPU-cores in a job. Only one job per user is shown."""
   cols = ["jobid", "netid", "cluster", "cores", "nodes", "gpus", "state", "partition", "elapsed-hours", "start-date", "start"]
@@ -202,7 +216,7 @@ if __name__ == "__main__":
 
   flags = "-L -a -X -P -n"
   start_date = datetime.now() - timedelta(days=args.days)
-  fields = "jobid,user,cluster,account,partition,cputimeraw,elapsedraw,timelimitraw,nnodes,ncpus,alloctres,submit,eligible,start,qos,state"
+  fields = "jobid,user,cluster,account,partition,cputimeraw,elapsedraw,timelimitraw,nnodes,ncpus,alloctres,submit,eligible,start,end,qos,state"
   renamings = {"user":"netid", "cputimeraw":"cpu-seconds", "nnodes":"nodes", "ncpus":"cores", "timelimitraw":"limit-minutes"}
   numeric_fields = ["cpu-seconds", "elapsedraw", "limit-minutes", "nodes", "cores", "submit", "eligible"]
   raw = raw_dataframe_from_sacct(flags, start_date, fields, renamings, numeric_fields, use_cache=not args.email)
@@ -262,6 +276,14 @@ if __name__ == "__main__":
   if not fg.empty:
     df_str = fg.to_string(index=False, justify="center")
     s += add_dividers(df_str, title="Multinode GPU jobs with fragmentation (all jobs, 2+ hours)")
+
+  ##############################
+  ### last jobs are failures ###
+  ##############################
+  fl = recent_jobs_all_failures(df)
+  if not fl.empty:
+    df_str = fl.to_string(index=False, justify="center")
+    s += add_dividers(df_str, title="All jobs failed on last day (4+ jobs)")
 
   ######################
   ### large gpu jobs ###
