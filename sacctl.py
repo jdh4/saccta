@@ -285,9 +285,9 @@ if __name__ == "__main__":
     df_str = fl.to_string(index=False, justify="center")
     s += add_dividers(df_str, title="All jobs failed on last day (4+ jobs)")
 
-  ######################
-  ### large gpu jobs ###
-  ######################
+  ##############################
+  ### large cpu and gpu jobs ###
+  ##############################
   df_str = jobs_with_the_most_cores(df).to_string(index=False, justify="center")
   s += add_dividers(df_str, title="Jobs with the most CPU-cores (1 job per user)")
   df_str = jobs_with_the_most_gpus(df).to_string(index=False, justify="center")
