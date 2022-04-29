@@ -323,7 +323,8 @@ if latex:
   pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", field2])
 
 # next line helps understand skew in queue times
-print(df[["qos", "q-hours"]].groupby("qos").describe().apply(round).astype('int64'))
+# added fillna as a fix on 4-29-2022 (useful when std is NaN)
+print(df[["qos", "q-hours"]].groupby("qos").describe().apply(round).fillna(0).astype('int64'))
 print("\n")
 
 # S T A T E
