@@ -27,7 +27,7 @@ The comprehensive report in PDF cited 1253. 463 were found on Adroit in that doc
 
 To calculate the number of GPU-hours:
 
-```
+```bash
 #!/bin/bash
 
 gpuseconds_total=0
