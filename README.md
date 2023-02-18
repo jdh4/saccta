@@ -33,7 +33,7 @@ SACCT="sacct -M traverse -a -X -P -n -S 2022-01-01T00:00:00 -E 2022-12-31T23:59:
 jobs_total=0
 gpu_seconds_total=0
 echo "gpus, gpu-seconds, jobs"
-for gpus in $($SACCT -o alloctres | grep "gres/gpu=" | cut -d"," -f3 | sort | uniq | sed 's/[^0-9]*//g')
+for gpus in $($SACCT -o alloctres | grep "gres/gpu=" | cut -d"," -f3 | sort | uniq | sed 's/[^0-9]*//g' | sort -n)
 do
     jobs=$($SACCT -o alloctres | grep "gres/gpu=$gpus," | wc -l)
     jobs_total=$((jobs_total + jobs))
