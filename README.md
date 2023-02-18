@@ -28,7 +28,7 @@ The comprehensive report in PDF cited 1253. 463 were found on Adroit in that doc
 To calculate the number of GPU-hours:
 
 ```
-$ sacct -M traverse -a -X -P -n -S 2022-01-01T00:00:00 -E 2022-12-31T23:59:59 -o elapsedraw,alloctres | grep gres/gpu=[1-9] | sed -E "s/\|.*gpu=/,/" | awk -F"," '{sum += $1*$2} END {print sum}'
+$ sacct -M traverse -a -X -P -n -S 2022-01-01T00:00:00 -E 2022-12-31T23:59:59 -o elapsedraw,alloctres | grep gres/gpu=[1-9] | sed -E "s/\|.*gpu=/,/" | awk -F"," '{sum += $1*$2} END {print int(sum/3600)}'
 ```
 
 More explicitly:
