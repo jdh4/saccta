@@ -642,14 +642,14 @@ def get_sponsors_getent_passwd(netid):
       return f"NOTSIXCOLON for {netid} in get_sponsors_getent_passwd()"
 
 def get_sponsors_cses_ldap(netid):
-  # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=jdh4 manager
+  # ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=jdh4 manager
   # manager: uid=curt,cn=users,cn=accounts,dc=rc,dc=princeton,dc=edu
 
-  # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=yixiaoc manager
+  # ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=yixiaoc manager
   # manager: uid=rcar,cn=users,cn=accounts,dc=rc,dc=princeton,dc=edu
   # manager: uid=weinan,cn=users,cn=accounts,dc=rc,dc=princeton,dc=edu
 
-  cmd = f"ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid={netid} manager"
+  cmd = f"ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid={netid} manager"
   output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=5, text=True, check=True)
   lines = output.stdout.split('\n')
   if lines != [] and lines[-1] == "": lines = lines[:-1]
@@ -666,17 +666,17 @@ def get_sponsors_cses_ldap(netid):
     return ",".join(managers)
     
 def get_sponsors_from_description(netid):
-  # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=npetsev description
+  # ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=npetsev description
   # description: della:pdebene=dGlja2V0IDI5NjYx,perseus:pdebene=dGlja2V0IDI5NjYx,s
   #  tellar:pdebene=bm9uZQ==,tiger:pdebene=dGlja2V0IDI5NjYx,tigress:pdebene=bm9uZQ
   #
-  # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright description
+  # ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright description
   # description: della:curt=R2FycmV0dCBpcyBhIGRldmVsb3BlciBpbiBSQw==,tiger:wtang=M
   # jc5MjQ=,tigress:curt=R2FycmV0dCBpcyBhIGRldmVsb3BlciBpbiBSQw==,traverse:curt=M
   # jg1MTg=
   #
-  # ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=ksabsay
-  cmd = f"ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid={netid} description"
+  # ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=ksabsay
+  cmd = f"ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid={netid} description"
   output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=5, text=True, check=True)
   lines = output.stdout.split('\n')
   if lines != [] and lines[-1] == "": lines = lines[:-1]
