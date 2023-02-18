@@ -29,14 +29,20 @@ To calculate the number of GPU-hours:
 
 ```bash
 #!/bin/bash
-
 SACCT="sacct -M traverse -a -X -P -n -S 2022-01-01T00:00:00 -E 2022-12-31T23:59:59"
-gpuseconds_total=0
-for gpus in $($SACCT -o alloctres | grep gres/gpu= | cut -d"," -f3 | sort | uniq | sed 's/[^0-9]*//g')
+jobs_total=0
+gpu_seconds_total=0
+echo "gpus, gpu-seconds, jobs"
+for gpus in $($SACCT -o alloctres | grep "gres/gpu=" | cut -d"," -f3 | sort | uniq | sed 's/[^0-9]*//g')
 do
-    gpuseconds=$($SACCT -o elapsedraw,alloctres | grep gres/gpu=$gpus | cut -d"|" -f1 | awk '{sum += $1} END {print sum}')
-    gpuseconds_total=$((gpuseconds_total + gpus * gpuseconds))
-    echo $gpus, $gpuseconds, $gpuseconds_total
+    jobs=$($SACCT -o alloctres | grep "gres/gpu=$gpus," | wc -l)
+    jobs_total=$((jobs_total + jobs))
+    run_seconds=$($SACCT -o elapsedraw,alloctres | grep "gres/gpu=$gpus," | cut -d"|" -f1 | awk '{sum += $1} END {print sum}')
+    gpu_seconds=$((gpus * run_seconds))
+    gpu_seconds_total=$((gpu_seconds_total + gpu_seconds))
+    echo $gpus, $gpu_seconds, $jobs
 done
-echo "GPU-hours="$((gpuseconds_total/3600))
+echo "GPU-seconds="$gpu_seconds_total
+echo "GPU-hours="$((gpu_seconds_total/3600))
+echo "Jobs="$jobs_total
 ```
