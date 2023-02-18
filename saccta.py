@@ -181,6 +181,11 @@ if host == "stellar-intel":
   df = df[~df.account.str.contains('cimes')]
   print(f"\nRemoving jobs with cimes* account (excluded {before - df.shape[0]} jobs).\n")
 
+if host == "traverse":
+  before = df.shape[0]
+  df = df[df.alloctres.str.contains('gres/gpu=')]
+  print(f"\nRemoving CPU jobs from Traverse (excluded {before - df.shape[0]} jobs or {100 * (before - df.shape[0]) / before}).\n")
+  
 print("\nPartitions:", np.sort(df.partition.unique()))
 print("Accounts:", np.sort(df.account.unique()))
 print("QOS:", np.sort(df.qos.unique()))
@@ -611,10 +616,10 @@ print(pairs)
 #################
 
 # The primary sponsor is obtained by calling:
-# ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright manager
+# ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright manager
 # In some cases the above produces multiple primary sponsors.
 # The cluster-specific sponsor is obtained by:
-# ldapsearch -x -H ldap://ldap1.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright description
+# ldapsearch -x -H ldap://ldap01.rc.princeton.edu -b dc=rc,dc=princeton,dc=edu uid=gbwright description
 # For users that have left, one can use R. Knight's CSV file to maybe find their sponsor
 # Rules are then applied between these three sources to find the correct sponsor for each user
 # Manual corrections can be made as the last step
@@ -767,7 +772,8 @@ if host != "adroit":
     #pairs.at[pairs[pairs.netid ==  "ksabsay"].index[0], "sponsor-best"] = "W. Bialek"
     pass
   if host == "traverse":
-    pass
+    pairs.at[pairs[pairs.netid ==   "mdpc"].index[0], "sponsor-best"] = "macohen"
+    pairs.at[pairs[pairs.netid == "sf4596"].index[0], "sponsor-best"] = "macohen"
   if host == "della":
     #pairs.at[pairs[pairs.netid ==      "vbb"].index[0], "sponsor-best"] = "Vir B. Bulchandani"
     #pairs.at[pairs[pairs.netid == "ecmorale"].index[0], "sponsor-best"] = "Eduardo Morales"
