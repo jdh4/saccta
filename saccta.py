@@ -161,6 +161,8 @@ df.account = df.account.str.replace("wws", "spia", regex=False)
 
 # next line serves as check of data type and may cause error
 # if encounter error then change jobname to jobid in sacct call above (but then no ondemand data)
+print(df[df.start == "Unknown"])
+df.start = df.apply(lambda row: row["eligible"] if row["start"] == "Unknown" else row["start"], axis="columns")
 df["start"] = df["start"].astype("int64")
 
 # a small number of jobs have "Unknown" as eligible with non-null alloctres and state "COMPLETED"
