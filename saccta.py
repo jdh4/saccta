@@ -1055,6 +1055,7 @@ pos.POSITION = pos.POSITION.str.replace('U[0-9][0-9][0-9][0-9]', 'Undergraduate'
 pos.POSITION = pos.POSITION.str.replace('XStaff', 'Staff', regex=False)
 pos.POSITION = pos.POSITION.str.replace('XDCU', 'DCU', regex=False)
 pos.POSITION = pos.POSITION.str.replace('DCU|RCU|RU|XMiscAffil', 'DCU, RCU, RU, XMiscAffil', regex=True)
+pos.POSITION = pos.POSITION.apply(lambda x: "Undergraduate" if x == "U" else x)
 
 d = {"cpu-hours":[np.size, np.sum], "gpu-hours":np.sum, "q-hours":np.sum}
 by_position = pos[["POSITION", "cpu-hours", "gpu-hours", "q-hours"]].groupby("POSITION").agg(d)
