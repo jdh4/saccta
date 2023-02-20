@@ -17,10 +17,16 @@ from datetime import datetime
 import re
 import numpy as np
 import pandas as pd
-import dossier  # wget https://raw.githubusercontent.com/jdh4/tigergpu_visualization/master/dossier.py
+# wget https://raw.githubusercontent.com/jdh4/tigergpu_visualization/master/dossier.py
+import dossier
+# wget https://raw.githubusercontent.com/PrincetonUniversity/monthly_sponsor_reports/main/sponsor.py
+from sponsor import get_sponsor_netid_per_cluster_dict_from_ldap
+from sponsor import get_full_name_from_ldap
+from sponsor import get_full_name_of_user_from_log
+from sponsor import get_sponsor_netid_of_user_from_log
 
-start_date = "2021-07-01T00:00:00"
-end_date   = "2021-12-31T23:59:59"
+start_date = "2022-01-01T00:00:00"
+end_date   = "2022-12-31T23:59:59"
 
 # generate latex files
 latex = True
@@ -552,6 +558,7 @@ def get_name_getent_passwd(netid):
 
 # overwrite value from dossier since a few are usually corrupted
 pairs.NAME = pairs.netid.apply(get_name_getent_passwd)
+pairs.NAME = pairs.apply(lambda row: row["NAME"] if not pd.isna(row["NAME"]) else get_full_name_of_user_from_log(row["netid"]), axis="columns")
 null_names = pairs[pd.isna(pairs.NAME)][["netid", "NAME"]]
 if not null_names.empty:
   print("\n")
@@ -723,57 +730,43 @@ if host != "adroit":
   # global list
   netids_with_sponsor_trouble = []
 
-  # dataframe of users that left university
-  fname = "users_left_university_from_robert_knight.csv"
-  if os.path.exists(fname):
-    rk = pd.read_csv(fname)
-    rk.info()
-  else:
-    rk = pd.DataFrame({"Netid_":pairs.netid, "Sponsor_Name_":pairs.shape[0] * [np.nan], \
-                       "Sponsor_Netid_":pairs.shape[0] * [np.nan]})
-  print("\n\nFirst few lines of rk:\n")
-  print(rk.head())
-  pairs = pairs.merge(rk, how="left", left_on="netid", right_on="Netid_")
-  
-  print("\n")
-  print("Running getent passwd on each user ... ", flush=True, end="")
-  pairs["sponsor-getent"] = pairs.netid.apply(get_sponsors_getent_passwd)
-  print("done.", flush=True)
-
-  print("Running ldapsearch (manager) on each user ... ", flush=True, end="")
-  pairs["sponsor-ldap"] = pairs.netid.apply(get_sponsors_cses_ldap)
-  print("done.", flush=True)
-
-  print("Running ldapsearch (description) on each user ... ", flush=True, end="")
-  pairs["sponsor-desc"] = pairs.netid.apply(get_sponsors_from_description)
-  print("done.", flush=True)
-
-  print("Comparing the three possible values for sponsor netid ... ", flush=True, end="")
-  pairs["sponsor-best"] = pairs.apply(lambda row: primary_vs_clusterspecific_vs_rk(row["netid"], \
-                                      row["sponsor-ldap"], row["sponsor-desc"], row["Sponsor_Netid_"]), axis='columns')
-  print("done.", flush=True, end="\n\n")
+  cluster = host.replace('cpu', '').replace('gpu', '').replace('-gpu', '').replace('-intel', '').replace('-amd', '')
+  pairs["sponsor-netid"] = pairs.netid.apply(lambda netid: get_sponsor_netid_per_cluster_dict_from_ldap(netid)[cluster])
+  pairs["sponsor-netid"] = pairs.apply(lambda row: row["sponsor-netid"] if row["sponsor-netid"] is not None else
+                                       get_sponsor_netid_of_user_from_log(row["netid"]), axis="columns")
 
   print("\n\nUsers with no sponsor (BEFORE manual corrections):\n")
-  print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
+  print(pairs[pd.isna(pairs["sponsor-netid"])][["netid", "NAME"]], end="\n\n")
 
   # M A N U A L    C O R R E C T I O N S    O N   S P O N S O R    N E T I D
   if host == "tigercpu" or host == "tigergpu":
-    pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
-    pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Shirkey, Jaden D.,MolBio,Nieng Yan", "Nieng Yan", regex=False)
-    pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Mathew Syriac Madhavacheril,Astro,Robert H. Lupton,Jo Dunkley", "Robert H. Lupton", regex=False)
+    #pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
+    #pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Shirkey, Jaden D.,MolBio,Nieng Yan", "Nieng Yan", regex=False)
+    #pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Mathew Syriac Madhavacheril,Astro,Robert H. Lupton,Jo Dunkley", "Robert H. Lupton", regex=False)
     #pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "rcar"
     #pairs.at[pairs[pairs.netid ==  "mathewm"].index[0], "sponsor-best"] = "rhl"
+    pass
   if host == "tigercpu":
     # mistake with jennyg -> description: tiger:USER=MzA5NDE=
     #pairs.at[pairs[pairs.netid == "jennyg"].index[0], "sponsor-best"] = "jennyg"
     #pairs.at[pairs[pairs.netid == "fj4172"].index[0], "sponsor-best"] = "E. Carter"
     pass
   if host == "tigergpu":
-    #pairs.at[pairs[pairs.netid ==  "ksabsay"].index[0], "sponsor-best"] = "W. Bialek"
+    #pairs.at[pairs[pairs.netid == "conniean"].index[0], "sponsor-best"] = "mawebb"
+    #pairs.at[pairs[pairs.netid == "jknodt"].index[0], "sponsor-best"] = "fheide"
+    #pairs.at[pairs[pairs.netid == "avv2"].index[0], "sponsor-best"] = "pmittal"
+    #pairs.at[pairs[pairs.netid == "soniagu"].index[0], "sponsor-best"] = "pmittal"
+    #pairs.at[pairs[pairs.netid == "mjshih"].index[0], "sponsor-best"] = "pmittal"
+    #pairs.at[pairs[pairs.netid == "noamm"].index[0], "sponsor-best"] = "knorman"
+    #pairs.at[pairs[pairs.netid == "mamiri"].index[0], "sponsor-best"] = "poor"
+    #pairs.at[pairs[pairs.netid == "weiliang"].index[0], "sponsor-best"] = "arod"
+    #pairs.at[pairs[pairs.netid == "phillipt"].index[0], "sponsor-best"] = "fheide"
+    #pairs.at[pairs[pairs.netid == "jclausen"].index[0], "sponsor-best"] = "djctwo"
     pass
   if host == "traverse":
-    pairs.at[pairs[pairs.netid ==   "mdpc"].index[0], "sponsor-best"] = "macohen"
-    pairs.at[pairs[pairs.netid == "sf4596"].index[0], "sponsor-best"] = "macohen"
+    #pairs.at[pairs[pairs.netid ==   "mdpc"].index[0], "sponsor-best"] = "macohen"
+    #pairs.at[pairs[pairs.netid == "sf4596"].index[0], "sponsor-best"] = "macohen"
+    pass
   if host == "della":
     #pairs.at[pairs[pairs.netid ==      "vbb"].index[0], "sponsor-best"] = "Vir B. Bulchandani"
     #pairs.at[pairs[pairs.netid == "ecmorale"].index[0], "sponsor-best"] = "Eduardo Morales"
@@ -781,38 +774,27 @@ if host != "adroit":
     #pairs.at[pairs[pairs.netid == "pekalski"].index[0], "sponsor-best"] = "William M. Jacobs"
     pass
   if host == "della-gpu":
-    pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
+    #pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
     #pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "R. Car"
+    pass
   if host == "stellar-intel":
     #pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-best"] = "Eliot Quataert"
     #pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-best"] = "M. Cohen"
     pass
 
   print("\n\nUsers with no sponsor (AFTER manual corrections):\n")
-  print(pairs[pd.isna(pairs["sponsor-best"])][["netid", "NAME"]], end="\n\n")
+  print(pairs[pd.isna(pairs["sponsor-netid"])][["netid", "NAME"]], end="\n\n")
 
   print("Running getent passwd on best sponsor ... ", flush=True, end="")
-  pairs["sponsor-name"] = pairs["sponsor-best"].apply(get_name_getent_passwd)
+  pairs["sponsor-name"] = pairs["sponsor-netid"].apply(lambda netid: get_full_name_from_ldap(netid, use_rc=True))
   print("done.", flush=True, end="\n\n")
   pairs["sponsor-name"] = pairs["sponsor-name"].fillna("UNKNOWN")
 
   # M A N U A L    C O R R E C T I O N S    O N   S P O N S O R    N A M E
-  if host == "tigercpu":
-    pairs.at[pairs[pairs.netid == "meerag"].index[0], "sponsor-name"] = "Martin Helmut Wuhr"
+  #if host == "tigercpu":
+  #  pairs.at[pairs[pairs.netid == "meerag"].index[0], "sponsor-name"] = "Martin Helmut Wuhr"
   
-  pairs["sponsor-getent"] = pairs["sponsor-getent"].apply(format_sponsor)
   pairs["sponsor-name"]   = pairs["sponsor-name"].apply(format_sponsor)
-
-  #print(pairs[["netid", "sponsor-ldap", "sponsor-desc", "Sponsor_Netid_", "sponsor-best", "sponsor-name", "sponsor-getent", "Sponsor_Name_"]])
-  print("\nUsers with sponsor trouble:")
-  print(netids_with_sponsor_trouble)
-  pairs["sponsor-trouble"] = pairs.netid.apply(lambda x: 1 if x in netids_with_sponsor_trouble else None)
-
-  # sponsor-getent is untrusted since it is obtained using the netid of the user instead directly using the netid of the sponsor
-  mismatch = pairs[pairs["sponsor-getent"] != pairs["sponsor-name"]][["netid", "sponsor-getent", "sponsor-name", "Sponsor_Netid_", "Sponsor_Name_"]]
-  if not mismatch.empty:
-    print("\n\nsponsor-getent does not match sponsor-name:")
-    print(mismatch, end="\n\n")
 
   print(pairs, end="\n\n")
   #print(pairs[["netid", "sponsor-getent", "sponsor-ldap", "sponsor-desc", "Sponsor_Netid_", "sponsor-name", "Sponsor_Name_", "sponsor-trouble"]])
@@ -851,13 +833,13 @@ def format_user(s):
 ##################################
 
 if host in checkgpu_hosts:
-  pairs = pairs[["netid", "NAME", "POSITION", "DEPT", "sponsor-ldap", "sponsor-getent", "sponsor-desc", "sponsor-name", \
-                 "sponsor-trouble", "partition", "account", "cpu-hours", "gpu-hours", "MEAN(%)", \
+  pairs = pairs[["netid", "NAME", "POSITION", "DEPT", "sponsor-netid", "sponsor-name", \
+                 "partition", "account", "cpu-hours", "gpu-hours", "MEAN(%)", \
                  "gpu-job", "CPU Jobs", "Total Jobs", "q-hours"]]
   pairs = pairs.sort_values("gpu-hours", ascending=False).reset_index(drop=True)
 elif (host == "stellar-amd" and partition == "--partition gpu"):
   pairs = pairs[["netid", "NAME", "POSITION", "DEPT", "partition", "account", \
-                 "sponsor-ldap", "sponsor-getent", "sponsor-desc", "sponsor-name", "sponsor-trouble", \
+                 "sponsor-netid", "sponsor-name",  \
                  "cpu-hours", "gpu-hours", "gpu-job", "CPU Jobs", "Total Jobs", "q-hours"]]
   pairs = pairs.sort_values("gpu-hours", ascending=False).reset_index(drop=True)
 else:
@@ -865,7 +847,7 @@ else:
     pairs = pairs[["netid", "NAME", "POSITION", "DEPT", "partition", "account", \
                    "cpu-hours", "gpu-hours", "gpu-job", "CPU Jobs", "Total Jobs", "q-hours"]]
   else:
-    pairs = pairs[["netid", "NAME", "POSITION", "DEPT", "sponsor-getent", "sponsor-trouble", "sponsor-name", \
+    pairs = pairs[["netid", "NAME", "POSITION", "DEPT", "sponsor-netid", "sponsor-name", \
                    "partition", "account", \
                    "cpu-hours", "gpu-hours", "gpu-job", "CPU Jobs", "Total Jobs", "q-hours"]]
   pairs = pairs.sort_values("cpu-hours", ascending=False).reset_index(drop=True)
@@ -906,8 +888,6 @@ users["Account"] = users.Account.apply(lambda x: x.upper())
 users["Account"] = users.Account.str.replace("PSYCHOLOGY", "PSYCH.", regex=False)
 if host != "adroit":
   users["Sponsor"] = users.Sponsor.str.replace("Panagiotopoulos", "Panagiotop.", regex=False)
-if host != "adroit":
-  users["NetID"] = users.apply(lambda row: row["NetID"] if pd.isna(row["sponsor-trouble"]) else row["NetID"] + "*", axis='columns')
 
 if host in checkgpu_hosts:
   if host == "traverse":
@@ -919,7 +899,7 @@ if host in checkgpu_hosts:
     base = f"{host}_users"
     users.to_csv(f"{base}.csv")
     fname = f"{base}.tex"
-    caption = (f"GPU utilization by user on {caption_host} from {date_range}. *User with non-trivial sponsorship.",  f"{caption_host} -- Utilization by User")
+    caption = (f"GPU utilization by user on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by User")
     include_index = True
     cf = (users.shape[1] + include_index) * "r"
     users.to_latex(fname, index=True, caption=caption, column_format=cf, label=f"{host}_users", longtable=True)
@@ -959,7 +939,7 @@ else:
     elif (host == "stellar-amd" and partition == "--partition gpu"):
       caption = (f"GPU utilization by user on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by User")
     else:
-      caption = (f"CPU utilization by user on {caption_host} from {date_range}. *User with non-trivial sponsorship.",  f"{caption_host} -- Utilization by User")
+      caption = (f"CPU utilization by user on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by User")
     include_index = True
     cf = (users.shape[1] + include_index) * "r"
     label = f"{host}_users" if not (host == "stellar-amd" and partition == "--partition gpu") else f"{host}_gpu_users"
@@ -984,9 +964,9 @@ else:
 
 if host != "adroit":
     # S P O N S O R
-    d = {"cpu-hours":[np.size, np.sum], "account":uniq_list, "gpu-hours":np.sum, "q-hours":np.sum}
-    by_sponsor = pairs[["Sponsor", "account", "cpu-hours", "gpu-hours", "q-hours"]].groupby("Sponsor").agg(d).copy()
-    by_sponsor.columns = ["Number of Users", "CPU-Hours", "Slurm Accounts", "GPU-Hours", "Q-Hours"]
+    d = {"cpu-hours":[np.size, np.sum], "account":uniq_list, "gpu-hours":np.sum, "q-hours":np.sum, "Sponsor":min}
+    by_sponsor = pairs[["Sponsor", "sponsor-netid", "account", "cpu-hours", "gpu-hours", "q-hours"]].groupby("sponsor-netid").agg(d).copy()
+    by_sponsor.columns = ["Number of Users", "CPU-Hours", "Slurm Accounts", "GPU-Hours", "Q-Hours", "Sponsor"]
     by_sponsor["Number of Users"] = by_sponsor["Number of Users"].astype("int32")
     if host in checkgpu_hosts:
       by_sponsor = by_sponsor.sort_values("GPU-Hours", ascending=False).reset_index(drop=False)
