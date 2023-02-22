@@ -84,9 +84,11 @@ elif host == "stellar-intel":
   partition = "--partition all,pppl,pu,serial"
   qos_test = ["stellar-debug"]
 elif host == "stellar-amd":
-  partition = "--partition bigmem,cimes"
+  #partition = "--partition bigmem,cimes"
+  # remove these files before getting gpu data then run "mv stellar-amd_users.tex stellar-gpu.tex"
+  # rm stellar-amd_sacct_2022-01-01T00-00-00_2022-12-31T23-59-59.csv stellar-amd_ldap_2022-01-01T00-00-00_2022-12-31T23-59-59.csv stellar-amd_netids.txt
   #partition = "--partition gpu"  # for gpu jobs
-  #partition = ""  # for other versus ondemand jobs
+  partition = ""  # for other versus ondemand jobs
   qos_test = ["stellar-debug"]
 else:
   print("Host not recognized. Exiting.")
@@ -939,7 +941,7 @@ else:
     if host == "adroit":
       caption = (f"CPU and GPU utilization by user on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by User")
     elif (host == "stellar-amd" and partition == "--partition gpu"):
-      caption = (f"GPU utilization by user on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by User")
+      caption = (f"GPU utilization by user on Stellar (GPU) from {date_range}.",  f"Stellar (GPU) -- Utilization by User")
     else:
       caption = (f"CPU utilization by user on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by User")
     include_index = True
