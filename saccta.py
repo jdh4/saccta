@@ -1,5 +1,5 @@
 # this script cannot be ran blindly for sponsor, position or dept
-
+# TDO: UTIL(%) in table needs slash for latex to escape percent, using gpu-seconds until end then gpu-hours
 # on initial pass, run over all partitions as a check for new partitions
 
 # run on della-gpu for della GPU data
@@ -79,7 +79,7 @@ elif host == "della":
   qos_test = ["test"]
 elif host == "della-gpu":
   partition = "--partition gpu"
-  qos_test = []
+  qos_test = ["gpu-test"]
 elif host == "stellar-intel":
   partition = "--partition all,pppl,pu,serial"
   qos_test = ["stellar-debug"]
@@ -153,8 +153,12 @@ df = pd.read_csv(fname, low_memory=False)
 df.info()
 print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
 
-df = df[~(pd.isna(df.alloctres) & (df["cpu-seconds"] == 0))]
-print("\nRemoved rows where alloctres == NULL and cpu-seconds == 0")
+if host == "della-gpu":
+  df = df[pd.notnull(df.alloctres) & df.alloctres.str.contains("gres/gpu=[1-9]", regex=True)]
+  print("\nRemoved rows where alloctres does not contain gres/gpu=[1-9]")
+else:
+  df = df[~(pd.isna(df.alloctres) & (df["cpu-seconds"] == 0))]
+  print("\nRemoved rows where alloctres == NULL and cpu-seconds == 0")
 
 df = df[~(df.state == "RUNNING")]
 print("Removed rows where state == RUNNING", "\n")
@@ -163,7 +167,7 @@ df.account = df.account.str.replace("wws", "spia", regex=False)
 
 # next line serves as check of data type and may cause error
 # if encounter error then change jobname to jobid in sacct call above (but then no ondemand data)
-print(df[df.start == "Unknown"])
+print("Number of jobs start=Unknown", df[df.start == "Unknown"].shape[0])
 df.start = df.apply(lambda row: row["eligible"] if row["start"] == "Unknown" else row["start"], axis="columns")
 df["start"] = df["start"].astype("int64")
 
@@ -181,9 +185,10 @@ print(df.describe().astype('int64'))
 
 if host == "della-gpu":
   print("\nraw QOSes:", np.sort(df.qos.unique()))
-  before = df.shape[0]
-  df = df[df.qos == "della-gpu"]
-  print(f"Only considering jobs in the della-gpu QOS (excluded {before - df.shape[0]} jobs).\n")
+  #before = df.shape[0]
+  #df = df[df.qos == "della-gpu"]
+  #df = df[df.alloctres.str.contains("gres/gpu=[1-9]", regex=True)]
+  #print(f"Only considering jobs in the della-gpu QOS (excluded {before - df.shape[0]} jobs).\n")
 
 if host == "stellar-intel":
   print("\nraw accounts:", np.sort(df.account.unique()))
@@ -200,6 +205,7 @@ print("\nPartitions:", np.sort(df.partition.unique()))
 print("Accounts:", np.sort(df.account.unique()))
 print("QOS:", np.sort(df.qos.unique()))
 print("Number of unique users:", df.netid.unique().size)
+print("Number of jobs:", df.shape[0])
 
 # write out unique netids
 with open(f"{host}_netids.txt", "w") as f:
@@ -259,6 +265,7 @@ df["gpus"] = df.alloctres.apply(gpus_per_job)
 df["gpu-seconds"] = df.apply(lambda row: row["elapsedraw"] * row["gpus"], axis='columns')
 df["gpu-job"] = df.alloctres.apply(is_gpu_job)
 df["cpu-only-seconds"] = df.apply(lambda row: 0 if row["gpus"] else row["cpu-seconds"], axis="columns")
+print("Total GPU-seconds:", round(df["gpu-seconds"].sum()))
 
 # convert seconds to hours
 df["cpu-only-hours"] = df["cpu-only-seconds"] / seconds_per_hour
@@ -498,7 +505,7 @@ if host in checkgpu_hosts:
     cg.to_csv(fname, index=False)
     print("done.", flush=True)
   cg = pd.read_csv(fname)
-  pairs = pairs.merge(cg, how="outer", left_on="netid", right_on="USER")
+  pairs = pairs.merge(cg, how="left", left_on="netid", right_on="USER")  # changed outer to left on 2/22/2023
 
   # check for ghost users (may be explained by running near downtime or short jobs)
   # checkgpu will give the same value for users with multiple slurm accounts
@@ -734,7 +741,7 @@ if host != "adroit":
   # global list
   netids_with_sponsor_trouble = []
 
-  cluster = host.replace('cpu', '').replace('gpu', '').replace('-gpu', '').replace('-intel', '').replace('-amd', '')
+  cluster = host.replace('cpu', '').replace('-gpu', '').replace('gpu', '').replace('-intel', '').replace('-amd', '')
   pairs["sponsor-netid"] = pairs.netid.apply(lambda netid: get_sponsor_netid_per_cluster_dict_from_ldap(netid)[cluster])
   pairs["sponsor-netid"] = pairs.apply(lambda row: row["sponsor-netid"] if row["sponsor-netid"] is not None else
                                        get_sponsor_netid_of_user_from_log(row["netid"]), axis="columns")
