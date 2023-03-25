@@ -139,6 +139,11 @@ elif not os.path.exists(fname):
   cmd = f"sacct -a -X -P -n -S {start_date} -E {end_date} -o {fmt} {states} {partition}"
   output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=600, text=True, check=True)
   lines = output.stdout.split('\n')
+  
+  # if encounter "UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 127525840: invalid start byte"
+  # output = subprocess.run(cmd, capture_output=True, shell=True, timeout=600)
+  # lines = output.stdout.decode("iso8859-1").split('\n')
+    
   if lines != [] and lines[-1] == "": lines = lines[:-1]
 
   # deal with "|" characters in jobname with [:len(cols)] in next line
@@ -169,6 +174,9 @@ df.account = df.account.str.replace("wws", "spia", regex=False)
 # if encounter error then change jobname to jobid in sacct call above (but then no ondemand data)
 print("Number of jobs start=Unknown", df[df.start == "Unknown"].shape[0])
 df.start = df.apply(lambda row: row["eligible"] if row["start"] == "Unknown" else row["start"], axis="columns")
+if host == "della":
+  print("Jobs with df.start == NaN", df[pd.isna(df.start)].shape[0])
+  df = df[pd.notna(df.start)]
 df["start"] = df["start"].astype("int64")
 
 # a small number of jobs have "Unknown" as eligible with non-null alloctres and state "COMPLETED"
