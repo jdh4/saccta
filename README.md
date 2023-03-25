@@ -52,3 +52,11 @@ echo "GPU-seconds="$gpu_seconds_total
 echo "GPU-hours="$((gpu_seconds_total/3600))
 echo "Jobs="$jobs_total
 ```
+
+## Other
+
+Encountered when including jobname on della (cpu).
+
+```
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 127525840: invalid start byte
+```
