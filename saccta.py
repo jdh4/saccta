@@ -720,6 +720,24 @@ def get_sponsors_from_description(netid):
     return snetid if not "(" in snetid else snetid.split("(")[0].strip()
   else:
     return None
+
+def extract_lastname_from_fullname(s: str) -> str:
+    """Extract last name from the full name of the person. Use with caution
+       downstream since sponsors can have the same last name."""
+    names = list(filter(lambda x: x not in ['Jr.', 'II', 'III', 'IV'], s.split()))
+    if len(names) == 2:
+        if len(names[1]) > 1: return names[1]
+        else: return " ".join(names)
+    elif (len(names) > 2):
+        idx = 0
+        while (names[idx].endswith('.') and (idx < len(names) - 1)):
+          idx += 1
+        names = names[idx:]
+        e = ''.join([str(int(name.endswith('.'))) for name in names])
+        if '1' in e: return ' '.join(names[e.index('1') + 1:])
+        else: return names[-1]
+    else:
+        return " ".join(names)
   
 def format_sponsor(s):
   if (not s) or pd.isna(s): return s
