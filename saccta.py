@@ -262,7 +262,8 @@ def gpus_per_job(tres):
       if "gres/gpu=" in part:
         gpus = int(part.split("=")[-1])
         assert gpus > 0
-    return gpus
+        return gpus
+    raise Exception("GPU count not found.")
   else:
     return 0
 
