@@ -89,7 +89,8 @@ print(cmb.POSITION.value_counts())
 ### 2nd groupby
 ##########################################################
 
-cmb["affil"] = cmb.POSITION.apply(lambda p: "external" if p in ["RCU", "DCU", "RU"] else "internal")
+# ignore cases such as "DCU (formerly G5)"
+cmb["affil"] = cmb.POSITION.apply(lambda p: "external" if p in ["RCU", "DCU", "RU", "XRCU", "XDCU"] else "internal")
 
 d = {"cpu-seconds":"sum", "gpu-seconds":"sum", "affil":"size"}
 ext = cmb.groupby("affil").agg(d)
