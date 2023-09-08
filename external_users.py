@@ -3,17 +3,17 @@ import subprocess
 import pandas as pd
 import dossier  # wget https://raw.githubusercontent.com/jdh4/tigergpu_visualization/master/dossier.py
 
-columns = "jobid,user,account,partition,cputimeraw,elapsedraw,alloctres,start,eligible,qos,state"
-fields = "jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state"
-
-use_cache = False
-
 start_date = "2023-01-01"
 cluster = "stellar"
+
+##########################################################
+### you should not need to make changes below this line
+##########################################################
+
 fname = f"sacct_{cluster}.csv"
 
-if not use_cache:
-
+if not os.path.isfile(fname):
+    fields = "jobid,user,account,partition,cputimeraw,elapsedraw,alloctres,start,eligible,qos,state"
     cmd = f"sacct -M {cluster} -a -X -P -n -S {start_date} -o {fields}"
     output = subprocess.run(cmd,
                             stdout=subprocess.PIPE,
@@ -21,18 +21,19 @@ if not use_cache:
                             timeout=100,
                             text=True,
                             check=True)
-
     rows = [row.split("|") for row in output.stdout.split()]
     df = pd.DataFrame(rows)
-    df.columns = columns.split(",")
-    df.to_csv(fname)
-
-df = pd.read_csv(fname)
+    df.columns = fields.split(",")
+    df.to_csv(fname, index=False)
+else:
+    print(f"Using cached file {fname} ...")
+    df = pd.read_csv(fname)
 df.info()
 
 df = df[pd.notna(df.elapsedraw)]
 #df = df[pd.notna(df.elapsedraw) & df.elapsedraw.str.isnumeric()]
 df.elapsedraw = df.elapsedraw.astype("int64")
+df.cputimeraw = df.cputimeraw.astype("int64")
 df = df[df.elapsedraw > 0]
 
 def gpus_per_job(tres: str) -> int:
@@ -52,7 +53,7 @@ print(df.head(2).T)
 
 
 ##########################################################
-### group by
+### groupby user
 ##########################################################
 d = {"cpu-seconds":"sum", "gpu-seconds":"sum", "user":"size"}
 by_user = df.groupby("user").agg(d)
@@ -66,14 +67,14 @@ print(by_user.head(10))
 ##########################################################
 dname = f"from_dossier_{cluster}.csv"
 if os.path.isfile(dname):
-    print(f"Using {dname} ...")
+    print(f"Using cached file {dname} ...")
     ds = pd.read_csv(dname)
 else:
     netids = sorted(df.user.unique().tolist())
     ds = pd.DataFrame(dossier.ldap_plus(netids))
     headers = ds.iloc[0]
     ds = pd.DataFrame(ds.values[1:], columns=headers)
-    ds.to_csv(dname)
+    ds.to_csv(dname, index=False)
 ds.info()
 
 
@@ -86,16 +87,23 @@ print(cmb.POSITION.value_counts().to_string())
 
 
 ##########################################################
-### 2nd groupby
+### groupby position
 ##########################################################
 
-# ignore cases such as "DCU (formerly G5)"
-cmb["affil"] = cmb.POSITION.apply(lambda p: "external" if p in ["RCU", "DCU", "RU", "XRCU", "XDCU"] else "internal")
+# ignore cases such as "RCU (formerly G5)" since that is a phd student finishing their work
+ext_pos = ["RCU", "DCU", "RU", "XRCU", "XDCU"]
+cmb["affil"] = cmb.POSITION.apply(lambda p: "external" if p in ext_pos else "internal")
 
 d = {"cpu-seconds":"sum", "gpu-seconds":"sum", "affil":"size"}
 ext = cmb.groupby("affil").agg(d)
 ext = ext.rename(columns={"affil":"users"})
 ext.reset_index(drop=False, inplace=True)
+
+
+
+seconds_per_hour = 3600
+ext["cpu-hours"] = ext["cpu-seconds"] / seconds_per_hour
+ext["gpu-hours"] = ext["gpu-seconds"] / seconds_per_hour
 
 def add_proportion_in_parenthesis(dframe, column_name, replace=False):
     assert column_name in dframe.columns
@@ -105,9 +113,6 @@ def add_proportion_in_parenthesis(dframe, column_name, replace=False):
     dframe[name] = dframe.apply(lambda row: f"{round(row[column_name])} ({row['proportion']}%)", axis='columns')
     dframe = dframe.drop(columns=["proportion"])
     return dframe
-
-ext["cpu-hours"] = ext["cpu-seconds"] / 3600
-ext["gpu-hours"] = ext["gpu-seconds"] / 3600
 
 ext = add_proportion_in_parenthesis(ext, "cpu-hours", replace=True)
 ext = add_proportion_in_parenthesis(ext, "gpu-hours", replace=True)
