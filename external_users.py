@@ -82,7 +82,7 @@ ds.info()
 ##########################################################
 cmb = by_user.merge(ds, how="left", left_on="user", right_on="NETID_TRUE")
 print(cmb.head(2).T)
-print(cmb.POSITION.value_counts())
+print(cmb.POSITION.value_counts().to_string())
 
 
 ##########################################################
