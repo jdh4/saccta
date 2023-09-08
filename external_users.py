@@ -89,7 +89,6 @@ print(cmb.POSITION.value_counts().to_string())
 ##########################################################
 ### groupby position
 ##########################################################
-
 # ignore cases such as "RCU (formerly G5)" since that is a phd student finishing their work
 ext_pos = ["RCU", "DCU", "RU", "XRCU", "XDCU"]
 cmb["affil"] = cmb.POSITION.apply(lambda p: "external" if p in ext_pos else "internal")
@@ -98,8 +97,6 @@ d = {"cpu-seconds":"sum", "gpu-seconds":"sum", "affil":"size"}
 ext = cmb.groupby("affil").agg(d)
 ext = ext.rename(columns={"affil":"users"})
 ext.reset_index(drop=False, inplace=True)
-
-
 
 seconds_per_hour = 3600
 ext["cpu-hours"] = ext["cpu-seconds"] / seconds_per_hour
