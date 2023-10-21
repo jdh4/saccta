@@ -1,5 +1,6 @@
 # this script cannot be ran blindly for sponsor, position or dept
-# TDO: UTIL(%) in table needs slash for latex to escape percent, using gpu-seconds until end then gpu-hours
+$ improve navigation by adding footer with links to each cluster and acccount, sponsor, users
+# use gpu-seconds until end then gpu-hours
 # on initial pass, run over all partitions as a check for new partitions
 # XMiscAffil should be moved out from RCU, DCU, RU (where is XRCU, XDCU?)
 
@@ -151,6 +152,7 @@ elif not os.path.exists(fname):
   # then add next line as first line in della_cpu.csv
   # jobid|netid|account|partition|cpu-seconds|elapsedraw|alloctres|start|eligible|qos|state|jobname
   # watch out for "|" characters in jobname -- may need to trim lines where these exist
+  # need to remove jobs that exist in both chunk1 and chunk2
   # set fname to della_cpu.csv above then read that in below: df = pd.read_csv(fname, sep="|", low_memory=False)
   ### DELLA (CPU) ###
  
@@ -297,9 +299,6 @@ df["cpu-hours"] = df["cpu-seconds"] / seconds_per_hour
 df["gpu-hours"] = df["gpu-seconds"] / seconds_per_hour
 df["q-hours"]   = df["q-seconds"]   / seconds_per_hour
 
-
-
-
 # helper function
 def add_proportion_in_parenthesis(dframe, column_name, replace=False):
   assert column_name in dframe.columns
@@ -352,8 +351,8 @@ q = df[["netid", "qos", field, "q-hours"]].copy()
 q = q.groupby("qos").agg({"qos":np.size, field:np.sum, "q-hours":[np.sum, np.mean, 'median'], "netid":lambda series: len(set(series))})
 q.columns = ["Number of Jobs", field2, "Q-Hours", "Mean Q-Hours per Job", "Median Q-Hours per Job", "Number of Users"]
 q["QOS"] = q.index
-q["Mean Q-Hours per Job"]   = q["Mean Q-Hours per Job"].apply(lambda x: round(x, 1))
-q["Median Q-Hours per Job"] = q["Median Q-Hours per Job"].apply(lambda x: round(x, 1))
+q["Mean Q-Hours per Job"]   = q["Mean Q-Hours per Job"].apply(lambda x: str(round(x, 1)))
+q["Median Q-Hours per Job"] = q["Median Q-Hours per Job"].apply(lambda x: str(round(x, 1)))
 q = q.sort_values(field2, ascending=False)
 q = add_proportion_in_parenthesis(q, "Number of Jobs", replace=True)
 q = add_proportion_in_parenthesis(q, field2, replace=True)
