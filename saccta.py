@@ -1,5 +1,5 @@
 # this script cannot be ran blindly for sponsor, position or dept
-$ improve navigation by adding footer with links to each cluster and acccount, sponsor, users
+# improve navigation by adding footer with links to each cluster and acccount, sponsor, users
 # use gpu-seconds until end then gpu-hours
 # on initial pass, run over all partitions as a check for new partitions
 # XMiscAffil should be moved out from RCU, DCU, RU (where is XRCU, XDCU?)
@@ -366,6 +366,16 @@ if latex:
   caption = (f"Breakdown of jobs by QOS on {caption_host} from {date_range}.", f"{caption_host} -- Utilization by QOS")
   q.to_latex(fname, index=False, caption=caption, column_format="rrcrrcc", label=f"{host}_qos")
   pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", field2])
+  # fixed underscores for latex
+  with open(fname, "r") as fo:
+    lines = fo.readlines()
+  underscore_corrected = []
+  for line in lines:
+    line = line.replace("NODE_FAIL", "NODE\_FAIL")
+    line = line.replace("OUT_OF_MEMORY", "OUT\_OF\_MEMORY")
+    underscore_corrected.append(line)
+  with open(fname, "w") as fo:
+    fo.writelines(underscore_corrected)
 
 # next line helps understand skew in queue times
 # added fillna as a fix on 4-29-2022 (useful when std is NaN)
