@@ -1,6 +1,7 @@
 # this script cannot be ran blindly for sponsor, position or dept
 # TDO: UTIL(%) in table needs slash for latex to escape percent, using gpu-seconds until end then gpu-hours
 # on initial pass, run over all partitions as a check for new partitions
+# XMiscAffil should be moved out from RCU, DCU, RU (where is XRCU, XDCU?)
 
 # run on della-gpu for della GPU data
 # run on della8 for della CPU data
@@ -25,8 +26,8 @@ from sponsor import get_full_name_from_ldap
 from sponsor import get_full_name_of_user_from_log
 from sponsor import get_sponsor_netid_of_user_from_log
 
-start_date = "2022-01-01T00:00:00"
-end_date   = "2022-12-31T23:59:59"
+start_date = "2023-01-01T00:00:00"
+end_date   = "2023-12-31T23:59:59"
 
 # generate latex files
 latex = True
@@ -79,6 +80,8 @@ elif host == "della":
   qos_test = ["test"]
 elif host == "della-gpu":
   partition = "--partition gpu"
+  #partition = "--partition mig"
+  #partition = "--partition cli"
   qos_test = ["gpu-test"]
 elif host == "stellar-intel":
   partition = "--partition all,pppl,pu,serial"
@@ -139,7 +142,18 @@ elif not os.path.exists(fname):
   cmd = f"sacct -a -X -P -n -S {start_date} -E {end_date} -o {fmt} {states} {partition}"
   output = subprocess.run(cmd, stdout=subprocess.PIPE, shell=True, timeout=600, text=True, check=True)
   lines = output.stdout.split('\n')
-  
+ 
+  ### DELLA (CPU) ###
+  # export SLURM_TIME_FORMAT="%s"
+  # sacct -a -X -P -n -S 2023-01-01T00:00:00 -E 2023-05-31T23:59:59 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,datascience,physics > chunk1.csv
+  # sacct -a -X -P -n -S 2023-06-01T00:00:00 -E 2023-10-18T12:00:00 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,datascience,physics > chunk2.csv
+  # cat chunk1.csv chunk2.csv > della_cpu.csv
+  # then add next line as first line in della_cpu.csv
+  # jobid|netid|account|partition|cpu-seconds|elapsedraw|alloctres|start|eligible|qos|state|jobname
+  # watch out for "|" characters in jobname -- may need to trim lines where these exist
+  # set fname to della_cpu.csv above then read that in below: df = pd.read_csv(fname, sep="|", low_memory=False)
+  ### DELLA (CPU) ###
+ 
   # if encounter "UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 127525840: invalid start byte"
   # output = subprocess.run(cmd, capture_output=True, shell=True, timeout=600)
   # lines = output.stdout.decode("iso8859-1").split('\n')
@@ -154,6 +168,7 @@ elif not os.path.exists(fname):
 else:
   print("\nUsing sacct cache file.\n")
 
+#df = pd.read_csv(fname, sep="|", low_memory=False)
 df = pd.read_csv(fname, low_memory=False)
 df.info()
 print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
@@ -507,13 +522,11 @@ def call_checkgpu(start_date, end_date):
   return cg
 
 if host in checkgpu_hosts:
-  fname = f"{host}_checkgpu_{start_date}_{end_date}.csv".replace(":","-")
-  if not os.path.exists(fname):
-    print("Calling checkgpu (which may require several seconds) ... ", end="", flush=True)
-    cg = call_checkgpu(start_date, end_date)
-    cg.to_csv(fname, index=False)
-    print("done.", flush=True)
-  cg = pd.read_csv(fname)
+  #USER,MEAN(%),STD(%),GPU-HOURS,PROPORTION(%),POSITION,DEPT,SPONSOR
+  cg = pairs[["netid"]].drop_duplicates()
+  cg["MEAN(%)"] = -1
+  cg["GPU-HOURS"] = -1
+  cg.columns = ["USER", "MEAN(%)", "GPU-HOURS"]
   pairs = pairs.merge(cg, how="left", left_on="netid", right_on="USER")  # changed outer to left on 2/22/2023
 
   # check for ghost users (may be explained by running near downtime or short jobs)
@@ -524,7 +537,7 @@ if host in checkgpu_hosts:
     print(pairs[pairs["MEAN(%)"].isna()][["netid", "gpu-hours", "gpu-job", "MEAN(%)"]])
     print("")
 
-  pairs.drop(columns=["USER", "STD(%)", "DEPT", "SPONSOR", "PROPORTION(%)", "POSITION"], inplace=True)
+  pairs.drop(columns=["USER"], inplace=True)
   pairs["MEAN(%)"] = pairs["MEAN(%)"].apply(lambda x: str(round(x)) if pd.notna(x) else "--")
 
 #sys.exit()
@@ -929,9 +942,9 @@ if host != "adroit":
 
 if host in checkgpu_hosts:
   if host == "traverse":
-    users = users[["NetID", "Name", "Position", "Sponsor", "Account", "GPU-Hours", "UTIL(%)", "GPU Jobs", "Total Jobs", "Q-Hours"]]
+    users = users[["NetID", "Name", "Position", "Sponsor", "Account", "GPU-Hours", "GPU Jobs", "Total Jobs", "Q-Hours"]]
   else:
-    users = users[["NetID", "Name", "Position", "User Dept", "Sponsor", "Partitions", "Account", "GPU-Hours", "UTIL(%)", "GPU Jobs", "Q-Hours"]]
+    users = users[["NetID", "Name", "Position", "User Dept", "Sponsor", "Partitions", "Account", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
   print(users)
   if latex:
     base = f"{host}_users"
