@@ -822,6 +822,7 @@ if host != "adroit":
     #pairs.at[pairs[pairs.netid == "weiliang"].index[0], "sponsor-best"] = "arod"
     #pairs.at[pairs[pairs.netid == "phillipt"].index[0], "sponsor-best"] = "fheide"
     #pairs.at[pairs[pairs.netid == "jclausen"].index[0], "sponsor-best"] = "djctwo"
+    #pairs.at[pairs[pairs.netid == "jclausen"].index[0], "sponsor-netid"] = "djctwo"
     pass
   if host == "traverse":
     #pairs.at[pairs[pairs.netid ==   "mdpc"].index[0], "sponsor-best"] = "macohen"
@@ -832,6 +833,7 @@ if host != "adroit":
     #pairs.at[pairs[pairs.netid == "ecmorale"].index[0], "sponsor-best"] = "Eduardo Morales"
     #pairs.at[pairs[pairs.netid == "eivshina"].index[0], "sponsor-best"] = "Joshua N. Winn"
     #pairs.at[pairs[pairs.netid == "pekalski"].index[0], "sponsor-best"] = "William M. Jacobs"
+    #pairs.at[pairs[pairs.netid ==    "pekalski"].index[0], "sponsor-netid"] = "William M. Jacobs"
     pass
   if host == "della-gpu":
     #pairs["sponsor-getent"] = pairs["sponsor-getent"].str.replace("Yixiao Chen,Chemistry,Roberto Car,Weinan E", "Roberto Car", regex=False)
@@ -840,6 +842,7 @@ if host != "adroit":
   if host == "stellar-intel":
     #pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-best"] = "Eliot Quataert"
     #pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-best"] = "M. Cohen"
+    #pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-netid"] = "M. Cohen"
     pass
 
   print("\n\nUsers with no sponsor (AFTER manual corrections):\n")
@@ -1109,11 +1112,16 @@ else:
 pos = pairs.copy()
 pos.POSITION = pos.POSITION.str.replace('G[0-9]', 'Graduate', regex=True)
 pos.POSITION = pos.POSITION.str.replace('Alumni', 'Graduate', regex=False)
+pos.POSITION = pos.POSITION.str.replace('XGraduate', 'Graduate', regex=False)
 pos.POSITION = pos.POSITION.str.replace('U[0-9][0-9][0-9][0-9]', 'Undergraduate', regex=True)
 pos.POSITION = pos.POSITION.str.replace('XStaff', 'Staff', regex=False)
 pos.POSITION = pos.POSITION.str.replace('XDCU', 'DCU', regex=False)
-pos.POSITION = pos.POSITION.str.replace('DCU|RCU|RU|XMiscAffil', 'DCU, RCU, RU, XMiscAffil', regex=True)
+pos.POSITION = pos.POSITION.str.replace('XRCU', 'RCU', regex=False)
+pos.POSITION = pos.POSITION.str.replace('DCU|RCU|RU', 'DCU, RCU, RU', regex=True)
 pos.POSITION = pos.POSITION.apply(lambda x: "Undergraduate" if x == "U" else x)
+pos.POSITION = pos.POSITION.str.replace(' (visiting)', '', regex=False)
+pos.POSITION = pos.POSITION.str.replace(' (emeritus)', '', regex=False)
+pos.POSITION = pos.POSITION.str.replace('Short-Term Affiliate', 'Short-Term Affil.', regex=False)
 
 d = {"cpu-hours":[np.size, np.sum], "gpu-hours":np.sum, "q-hours":np.sum}
 by_position = pos[["POSITION", "cpu-hours", "gpu-hours", "q-hours"]].groupby("POSITION").agg(d)
