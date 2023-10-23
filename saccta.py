@@ -3,6 +3,7 @@
 # use gpu-seconds until end then gpu-hours
 # on initial pass, run over all partitions as a check for new partitions
 # XMiscAffil should be moved out from RCU, DCU, RU (where is XRCU, XDCU?)
+# removing cpu jobs on traverse and reporting gpu jobs, total jobs
 
 # run on della-gpu for della GPU data
 # run on della8 for della CPU data
