@@ -146,7 +146,7 @@ def get_name_getent_passwd(netid):
 
 # sacct -M della -a -X -P -n -S 2020-02-01T00:00:00 -E 2023-01-31T23:59:59 -o user,account,elapsedraw,alloctres --partition=gpu,mig > raw.csv
 df = pd.read_csv("raw.csv", sep="|")
-df = df.rename(columns={"user":"netid", "cputimeraw":"gpu-hours"})
+df = df.rename(columns={"user":"netid", "cputimeraw":"gpu-hours"})  # TODO
 df.info()
 print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
 print(df.columns)
