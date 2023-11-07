@@ -16,7 +16,7 @@ def gpus_per_job(tres: str) -> int:
     else:
         return 0
 
-# sacct -M della -a -X -P -S 2023-08-31T00:00:00 -o user,account,elapsedraw,alloctres,admincomment --partition=gpu > raw.csv
+# sacct -M della -a -X -P -S 2023-05-01T00:00:00 -o jobid,user,account,elapsedraw,alloctres,admincomment --partition=gpu > raw.csv
 sacct = pd.read_csv("raw.csv", sep="|")
 sacct.columns = "JobID|User|Account|ElapsedRaw|AllocTRES|AdminComment".lower().split("|")
 
@@ -39,11 +39,12 @@ print(sacct.tail(5))
 sacct["zero-gpu-seconds"] = sacct["elapsedraw"] * sacct["GPUs-Unused"]
 sacct["zero-gpu-hours"] = sacct["zero-gpu-seconds"] / 3600
 sacct["gpu-seconds"] = sacct["elapsedraw"] * sacct["gpus"]
+
 print(sacct["zero-gpu-seconds"].sum() / 3600)
 print(sacct["gpu-seconds"].sum() / 3600)
 
-print(sacct[(sacct["user"] == "mw0425") & (sacct["GPUs-Unused"] > 0)][["user", "jobid", "zero-gpu-hours"]].sort_values("zero-gpu-hours").to_string())
+#print(sacct[(sacct["user"] == "mw0425") & (sacct["GPUs-Unused"] > 0)][["user", "jobid", "zero-gpu-hours"]].sort_values("zero-gpu-hours").to_string())
 
 gp = sacct.groupby("user").agg({"zero-gpu-seconds":"sum"})
-gp["zero-gpu-seconds"] = gp["zero-gpu-seconds"] / 3600
-print(gp.sort_values("zero-gpu-seconds", ascending=False).head(10).to_string())
+gp["zero-gpu-hours"] = gp["zero-gpu-seconds"] / 3600
+print(gp.sort_values("zero-gpu-hours", ascending=False).head(10).to_string())
