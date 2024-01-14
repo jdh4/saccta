@@ -1,5 +1,25 @@
 # saccta
 
+Notes on January 14, 2024:
+
+After copying the cluster_utilization_20XX.tex file, comment out the latex `input` commands by running this in vim:
+
+```
+%s/\\input/%\\input
+```
+
+Then uncomment for Adroit and build the document.
+
+Need to escape underscores in `adroit/adroit_ondemand.tex`:
+
+```
+sys/dashboard/sys/rstudio\_server-generic/nodes
+```
+
+Need to escape underscores in `adroit/adroit_state.tex` like "NODE_FAIL".
+
+## Other
+
 Adroit:
 
 ```
