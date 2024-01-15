@@ -180,8 +180,12 @@ if host == "della-gpu":
   df = df[pd.notnull(df.alloctres) & df.alloctres.str.contains("gres/gpu=[1-9]", regex=True)]
   print("\nRemoved rows where alloctres does not contain gres/gpu=[1-9]")
 else:
-  df = df[~(pd.isna(df.alloctres) & (df["cpu-seconds"] == 0))]
-  print("\nRemoved rows where alloctres == NULL and cpu-seconds == 0")
+  #df = df[~(pd.isna(df.alloctres) & (df["cpu-seconds"] == 0))]
+  df.alloctres = df.alloctres.fillna("")
+  print("Null alloctres and cpu-seconds > 0")
+  print(df[(df.alloctres == "") & (df["cpu-seconds"] > 0)])
+  assert df[(df.alloctres == "") & (df["cpu-seconds"] > 0)].shape[0] == 0
+  #print("\nRemoved rows where alloctres == NULL and cpu-seconds == 0")
 
 df = df[~(df.state == "RUNNING")]
 print("Removed rows where state == RUNNING", "\n")
@@ -192,9 +196,13 @@ df.account = df.account.str.replace("wws", "spia", regex=False)
 # if encounter error then change jobname to jobid in sacct call above (but then no ondemand data)
 print("Number of jobs start=Unknown", df[df.start == "Unknown"].shape[0])
 df.start = df.apply(lambda row: row["eligible"] if row["start"] == "Unknown" else row["start"], axis="columns")
-if host == "della":
-  print("Jobs with df.start == NaN", df[pd.isna(df.start)].shape[0])
-  df = df[pd.notna(df.start)]
+if host == "della" or host == "adroit":
+  #print("Jobs with df.start == NaN", df[pd.isna(df.start)].shape[0])
+  #df = df[pd.notna(df.start)]
+  df.start = df.start.fillna(-1)
+  print("Jobs with df.start == NaN and cpu-seconds > 0")
+  print(df[(df.start == -1) & (df["cpu-seconds"] > 0)])
+  assert df[(df.start == -1) & (df["cpu-seconds"] > 0)].shape[0] == 0
 df["start"] = df["start"].astype("int64")
 
 # a small number of jobs have "Unknown" as eligible with non-null alloctres and state "COMPLETED"
@@ -561,7 +569,7 @@ if host in checkgpu_hosts:
 fname = f"{host}_ldap_{start_date}_{end_date}.csv".replace(":","-")
 if not os.path.exists(fname):
   print("Calling ldapsearch on each user (which may require several seconds) ... ", end="", flush=True)
-  ld = pd.DataFrame(dossier.ldap_plus(pairs.netid.unique().tolist()))
+  ld = pd.DataFrame(dossier.ldap_plus(pairs.netid.unique().tolist(), level=1))
   ld.columns = ld.iloc[0]
   ld = ld.drop(ld.index[0])
   ld.to_csv(fname, index=False)
@@ -916,12 +924,13 @@ else:
                    "cpu-hours", "gpu-hours", "gpu-job", "CPU Jobs", "Total Jobs", "q-hours"]]
   pairs = pairs.sort_values("cpu-hours", ascending=False).reset_index(drop=True)
 
-pairs = add_proportion_in_parenthesis(pairs, "gpu-job", replace=False)
-pairs = add_proportion_in_parenthesis(pairs, "gpu-hours", replace=False)
-pairs = add_proportion_in_parenthesis(pairs, "Total Jobs", replace=True)
-pairs = add_proportion_in_parenthesis(pairs, "CPU Jobs", replace=True)
 pairs = add_proportion_in_parenthesis(pairs, "cpu-hours", replace=False)
-pairs = add_proportion_in_parenthesis(pairs, "q-hours", replace=False)
+pairs = add_proportion_in_parenthesis(pairs, "gpu-hours", replace=False)
+if host != "adroit":
+    pairs = add_proportion_in_parenthesis(pairs, "gpu-job", replace=False)
+    pairs = add_proportion_in_parenthesis(pairs, "Total Jobs", replace=True)
+    pairs = add_proportion_in_parenthesis(pairs, "CPU Jobs", replace=True)
+    pairs = add_proportion_in_parenthesis(pairs, "q-hours", replace=False)
 
 pairs = pairs.rename(columns={"sponsor-name":"Sponsor"})
 pairs.NAME = pairs.NAME.apply(format_user)
@@ -946,7 +955,9 @@ users = pairs.rename(columns={"NAME": "Name", "netid": "NetID", "POSITION":"Posi
                               "partition":"Partitions", "account":"Account", \
                               "cpu-hours-cmb":"CPU-Hours", "gpu-hours-cmb":"GPU-Hours", \
                               "gpu-job-cmb":"GPU Jobs", \
-                              "q-hours-cmb":"Q-Hours"}).copy()
+                              "q-hours-cmb":"Q-Hours", \
+                              "q-hours":"Q-Hours", \
+                              "gpu-job":"GPU Jobs"}).copy()
 
 users["Account"] = users.Account.apply(lambda x: x.upper())
 users["Account"] = users.Account.str.replace("PSYCHOLOGY", "PSYCH.", regex=False)
@@ -974,6 +985,7 @@ if host in checkgpu_hosts:
 else:
   if host == "adroit":
     users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "CPU-Hours", "Total Jobs", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
+    users["Q-Hours"] = users["Q-Hours"].apply(round)
   elif (host == "stellar-amd" and partition == "--partition gpu"):
     users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
   elif (host == "stellar-amd" and partition == "--partition bigmem,cimes"):
@@ -1009,7 +1021,8 @@ else:
     label = f"{host}_users" if not (host == "stellar-amd" and partition == "--partition gpu") else f"{host}_gpu_users"
     users.to_latex(fname, index=True, caption=caption, column_format=cf, label=label, longtable=True)
     if host == "adroit":
-      pad_multicolumn(fname, ["GPU-Hours", "CPU-Hours", "Q-Hours", "Total Jobs", "GPU Jobs"])
+      #pad_multicolumn(fname, ["GPU-Hours", "CPU-Hours", "Q-Hours", "Total Jobs", "GPU Jobs"])
+      pad_multicolumn(fname, ["GPU-Hours", "CPU-Hours"])
     elif (host == "stellar-amd" and partition == "--partition gpu"):
       pad_multicolumn(fname, ["GPU-Hours", "Q-Hours", "GPU Jobs"])
     else:
