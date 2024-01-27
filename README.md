@@ -73,6 +73,13 @@ echo "GPU-hours="$((gpu_seconds_total/3600))
 echo "Jobs="$jobs_total
 ```
 
+## One-liner
+
+```
+$ DAYS=90; GPUS=316; PARTITION=gpu; sacct -M della -a -X -P -n -S $(date -d"${DAYS} days ago" +%F) -E now -o elapsedraw,alloctres,state --partition=${PARTITION} | grep gres/gpu=[1-9] | sed -E "s/\|.*gpu=/,/" | awk -v gpus=${GPUS} -v days=${DAYS} -F"," '{sum += $1*$2} END {print "GPU-hours used = "int(100*sum/3600/24/gpus/days)"%"}'
+GPU-hours used = 92%
+```
+
 ## Other
 
 Encountered when including jobname on della (cpu).
