@@ -128,7 +128,7 @@ if __name__ == "__main__":
         plt.xticks(years, map(str, years))
 
     elif cluster == "traverse":
-        nrows = 1
+        nrows = 2
         ncols = 3
 
         opts = {"mfc":"tab:blue",
@@ -155,6 +155,14 @@ if __name__ == "__main__":
         plt.plot(years, [x/1e6 for x in gpu_hours], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("GPU-Hours / $10^6$")
+        plt.xticks(years, map(str, years))
+
+        plt.subplot(nrows, ncols, 4)
+        avail = 365 * 24 * 46 * 4
+        plt.plot(years[1:], [x/avail for x in gpu_hours[1:]], 'o', **opts)
+        plt.ylim(0, 1)
+        plt.xlabel("Year")
+        plt.ylabel("GPU-Hours / GPU-Hours Available")
         plt.xticks(years, map(str, years))
 
     elif cluster == "tiger2":
