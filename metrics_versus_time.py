@@ -38,6 +38,7 @@ if __name__ == "__main__":
         gpu_partitions = "--partition=gpu"
 
     years = [2019, 2020, 2021, 2022, 2023]
+    years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
     users = []
     gpu_users = []
     ondemand_users = []
@@ -167,7 +168,7 @@ if __name__ == "__main__":
 
     elif cluster == "tiger2":
         nrows = 1
-        ncols = 2
+        ncols = 3
 
         opts = {"mfc":"tab:blue",
                 "mec":"tab:blue",
@@ -176,26 +177,41 @@ if __name__ == "__main__":
                 "markersize":6,
                 "color":'lightgrey'}
 
-        fig = plt.figure(figsize=(8, 2.5))
+        fig = plt.figure(figsize=(12, 2.5))
         plt.subplot(nrows, ncols, 1)
         plt.plot(years, users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of Users")
         plt.xticks(years, map(str, years))
 
-        if False:
+        if 0:
             plt.subplot(nrows, ncols, 2)
             plt.plot(years, [x/1e6 for x in cpu_hours], 'o', **opts)
             plt.xlabel("Year")
             plt.ylabel("CPU-Hours / $10^6$")
             plt.xticks(years, map(str, years))
+
+            plt.subplot(nrows, ncols, 3)
+            avail = 408 * 40 * 365 * 24
+            plt.plot(years[2:], [x/avail for x in cpu_hours[2:]], 'o', **opts)
+            plt.xlabel("Year")
+            plt.ylabel("CPU-Hours / CPU-Hours Avail.")
+            plt.xticks(years, map(str, years))
             cluster = "tigercpu"
 
-        if True:
+        if 1:
             plt.subplot(nrows, ncols, 2)
             plt.plot(years, [x/1e6 for x in gpu_hours], 'o', **opts)
             plt.xlabel("Year")
             plt.ylabel("GPU-Hours / $10^6$")
+            plt.xticks(years, map(str, years))
+
+            plt.subplot(nrows, ncols, 3)
+            avail = 80 * 4 * 365 * 24
+            plt.plot(years[2:-1], [x/avail for x in gpu_hours[2:-1]], 'o', **opts)
+            plt.ylim(0, 1)
+            plt.xlabel("Year")
+            plt.ylabel("GPU-Hours / GPU-Hours Avail.")
             plt.xticks(years, map(str, years))
             cluster = "tigergpu"
 
