@@ -187,10 +187,22 @@ else:
   assert df[(df.alloctres == "") & (df["cpu-seconds"] > 0)].shape[0] == 0
   #print("\nRemoved rows where alloctres == NULL and cpu-seconds == 0")
 
-df = df[~(df.state == "RUNNING")]
-print("Removed rows where state == RUNNING", "\n")
-
 df.account = df.account.str.replace("wws", "spia", regex=False)
+
+num_jobs = df[df.state == "RUNNING"].shape[0]
+df = df[~(df.state == "RUNNING")]
+print(f"Removed {num_jobs} rows where state == RUNNING", "\n")
+
+num_notnull = df[pd.notna(df.start)].shape[0]
+print(f"Number of jobs where start is not null: {num_notnull}")
+num_null = df[pd.isna(df.start)].shape[0]
+print(f"Number of jobs where start is null: {num_null}")
+num_unknown = df[df.start == "Unknown"].shape[0]
+print(f"Number of jobs where start is 'Unknown': {num_unknown}")
+num_unknown = df[(df.start == "Unknown") & ()].shape[0]
+print(f"Number of jobs where start is 'Unknown' and cpu-seconds > 0: {num_unknown}")
+assert df.shape[0] == num_notnull + num_null + num_unknown
+sys.exit()
 
 # next line serves as check of data type and may cause error
 # if encounter error then change jobname to jobid in sacct call above (but then no ondemand data)
