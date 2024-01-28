@@ -22,7 +22,7 @@ def get_from_sacct(year: str, cluster: str, action: str) -> int:
 
 if __name__ == "__main__":
 
-    cluster = "tiger2"
+    cluster = "stellar"
     if cluster == "adroit":
         all_partitions = "--partition=all,class,gpu"
         cpu_partitions = "--partition=all,class,gpu"
@@ -36,9 +36,15 @@ if __name__ == "__main__":
         all_partitions = "--partition=gpu"
         cpu_partitions = "--partition=cpu,ext,serial"
         gpu_partitions = "--partition=gpu"
+    elif cluster == "stellar":
+        all_partitions = "--partition=cimes"
+        #all_partitions = "--partition=all,pppl,pu,serial"
+        #all_partitions = "--partition=gpu"
+        #cpu_partitions = "--partition=all,pppl,pu,serial"
+        cpu_partitions = "--partition=cimes"
+        gpu_partitions = "--partition=gpu"
 
-    years = [2019, 2020, 2021, 2022, 2023]
-    years = [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+    years = range(2021, 2024)
     users = []
     gpu_users = []
     ondemand_users = []
@@ -56,7 +62,7 @@ if __name__ == "__main__":
         action = f"-o elapsedraw,alloctres {gpu_partitions}" + " | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
         gpu_hours.append(get_from_sacct(year, cluster, action))
 
-        if cluster == "adroit":
+        if cluster == "adroit" or cluster == "stellar":
             action = f"-o user {gpu_partitions} | sort | uniq | wc -l"
             gpu_users.append(get_from_sacct(year, cluster, action))
 
@@ -81,6 +87,13 @@ if __name__ == "__main__":
     ####################
     # write the figure #
     ####################
+    opts = {"mfc":"tab:blue",
+            "mec":"tab:blue",
+            "linestyle":'dashed',
+            "linewidth":1,
+            "markersize":6,
+            "color":'lightgrey'}
+
     if cluster == "adroit":
         nrows = 3
         ncols = 3
@@ -132,13 +145,6 @@ if __name__ == "__main__":
         nrows = 2
         ncols = 3
 
-        opts = {"mfc":"tab:blue",
-                "mec":"tab:blue",
-                "linestyle":'dashed',
-                "linewidth":1,
-                "markersize":6,
-                "color":'lightgrey'}
-
         fig = plt.figure(figsize=(11, 2.5))
         plt.subplot(nrows, ncols, 1)
         plt.plot(years, users, 'o', **opts)
@@ -165,17 +171,28 @@ if __name__ == "__main__":
         plt.xlabel("Year")
         plt.ylabel("GPU-Hours / GPU-Hours Available")
         plt.xticks(years, map(str, years))
+    elif cluster == "stellar":
+        nrows = 1
+        ncols = 2
+
+        fig = plt.figure(figsize=(8, 2.5))
+        plt.subplot(nrows, ncols, 1)
+        plt.plot(years, users, 'o', **opts)
+        plt.xlabel("Year")
+        plt.ylabel("Number of Users")
+        plt.xticks(years, map(str, years))
+
+        plt.subplot(nrows, ncols, 2)
+        plt.plot(years, [x/1e6 for x in cpu_hours], 'o', **opts)
+        plt.xlabel("Year")
+        plt.ylabel("CPU-Hours / $10^6$")
+        plt.xticks(years, map(str, years))
+        #cluster = "stellar_intel"
+        cluster = "stellar_amd"
 
     elif cluster == "tiger2":
         nrows = 1
         ncols = 3
-
-        opts = {"mfc":"tab:blue",
-                "mec":"tab:blue",
-                "linestyle":'dashed',
-                "linewidth":1,
-                "markersize":6,
-                "color":'lightgrey'}
 
         fig = plt.figure(figsize=(12, 2.5))
         plt.subplot(nrows, ncols, 1)
