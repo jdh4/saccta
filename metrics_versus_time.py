@@ -22,8 +22,10 @@ def get_from_sacct(year: str, cluster: str, action: str) -> int:
 
 if __name__ == "__main__":
 
-    cluster = "stellar"
+    cluster = "adroit"
     if cluster == "adroit":
+        # ignoring cloud partition
+        # including gpu partition in total cpu-hours (see cpu_partitions)
         all_partitions = "--partition=all,class,gpu"
         cpu_partitions = "--partition=all,class,gpu"
         gpu_partitions = "--partition=gpu"
@@ -44,7 +46,7 @@ if __name__ == "__main__":
         cpu_partitions = "--partition=cimes"
         gpu_partitions = "--partition=gpu"
 
-    years = range(2021, 2024)
+    years = range(2018, 2024)
     users = []
     gpu_users = []
     ondemand_users = []
@@ -100,43 +102,43 @@ if __name__ == "__main__":
 
         fig = plt.figure(figsize=(11, 7.5))
         plt.subplot(nrows, ncols, 1)
-        plt.scatter(years, users)
+        plt.plot(years, users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of Users")
         plt.xticks(years, map(str, years))
 
         plt.subplot(nrows, ncols, 2)
-        plt.scatter(years, gpu_users)
+        plt.plot(years, gpu_users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of GPU Users")
         plt.xticks(years, map(str, years))
 
         plt.subplot(nrows, ncols, 3)
-        plt.scatter(years, ondemand_users)
+        plt.plot(years, ondemand_users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of OOD Users")
         plt.xticks(years, map(str, years))
 
         plt.subplot(nrows, ncols, 4)
-        plt.scatter(years, [x/1e6 for x in cpu_hours])
+        plt.plot(years, [x/1e6 for x in cpu_hours], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("CPU-Hours / $10^6$")
         plt.xticks(years, map(str, years))
 
         plt.subplot(nrows, ncols, 5)
-        plt.scatter(years, gpu_hours)
+        plt.plot(years, gpu_hours, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("GPU-Hours")
         plt.xticks(years, map(str, years))
 
         plt.subplot(nrows, ncols, 6)
-        plt.scatter(years,  [x / y for x, y in zip(ondemand_cpu_hours, cpu_hours)])
+        plt.plot(years,  [x / y for x, y in zip(ondemand_cpu_hours, cpu_hours)], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("OOD CPU-Hours / CPU-Hours")
         plt.xticks(years, map(str, years))
 
         plt.subplot(nrows, ncols, 7)
-        plt.scatter(years,  [x / y for x, y in zip(ondemand_gpu_hours, gpu_hours)])
+        plt.plot(years,  [x / y for x, y in zip(ondemand_gpu_hours, gpu_hours)], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("OOD GPU-Hours / GPU-Hours")
         plt.xticks(years, map(str, years))
