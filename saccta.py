@@ -207,7 +207,10 @@ assert df.shape[0] == num_notnull + num_null + num_unknown
 print("df.eligible.min() = ", df.eligible.min())
 print("df.eligible.max() = ", df.eligible.max())
 ans = df[df.start < df.eligible].shape[0]
-print(f"\nNumber of jobs with start < eligible: {ans} ({round(100 * ans / df.shape[0])}%)\n")
+if ans:
+    print(f"\nNumber of jobs with start < eligible: {ans} ({round(100 * ans / df.shape[0])}%)\n")
+    print(df[df.start < df.eligible])
+
 
 # convert to null so that these jobs are skipped in calculation of Q-hours
 print("Converting 'Unknown' to null for df.start and df.eligible ...")
@@ -302,9 +305,9 @@ print(f"Number of production (non-test) jobs with cpu-seconds = 0: {ans} ({round
 seconds_per_hour = 3600
 prod = prod[prod["elapsedraw"] >= seconds_per_hour]
 ans = prod[prod["q-seconds"] <= seconds_per_hour].shape[0]
-print(f"Number of production (non-test) jobs that ran for > 1 hr and started within 1 hour: {ans} ({round(100 * ans / prod.shape[0])}%)")
+print(f"Percentage of production (non-test) jobs that ran for $>$ 1 hr and started within 1 hour: {round(100 * ans / prod.shape[0])}\\% {ans}")
 ans = prod[prod["q-seconds"] <= 24 * seconds_per_hour].shape[0]
-print(f"Number of production (non-test) jobs that ran for > 1 hr and started within 24 hours: {ans} ({round(100 * ans / prod.shape[0])}%)\n\n")
+print(f"Percentage of production (non-test) jobs that ran for $>$ 1 hr and started within 24 hours: {round(100 * ans / prod.shape[0])}\\% {ans}\n\n")
 del prod
 
 
@@ -697,6 +700,9 @@ if host == "adroit":
   #pairs.at[pairs[pairs.netid == "efleisig"].index[0], "NAME"] = "Eve N. Fleisig"
   #pairs.at[pairs[pairs.netid == "danieleg"].index[0], "NAME"] = "Daniel E. Gitelman"
   pass
+if host == "stellar-intel":
+  pairs.at[pairs[pairs.netid ==  "jg4602"].index[0], "NAME"] = "Julia Granato"
+  pairs.at[pairs[pairs.netid == "jg4602"].index[0], "DEPT"] = "PPPL"
 print(pairs)
 
 #sys.exit()
@@ -885,10 +891,11 @@ if host != "adroit":
     #pairs.at[pairs[pairs.netid ==  "yixiaoc"].index[0], "sponsor-best"] = "R. Car"
     pass
   if host == "stellar-intel":
-    #pairs.at[pairs[pairs.netid == "nlinzer"].index[0], "sponsor-best"] = "Eliot Quataert"
+    pairs.at[pairs[pairs.netid == "jg4602"].index[0], "sponsor-best"] = "Marc Cohen"
+    pairs.at[pairs[pairs.netid == "jg4602"].index[0], "sponsor-netid"] = "macohen"
     #pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-best"] = "M. Cohen"
     #pairs.at[pairs[pairs.netid ==    "ws17"].index[0], "sponsor-netid"] = "M. Cohen"
-    pass
+    #pass
 
   print("\n\nUsers with no sponsor (AFTER manual corrections):\n")
   print(pairs[pd.isna(pairs["sponsor-netid"])][["netid", "NAME"]], end="\n\n")
