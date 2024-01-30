@@ -17,10 +17,6 @@ def get_from_sacct(year: str, cluster: str, action: str) -> int:
     output = output.stdout
     print(cmd)
     print(output)
-    if "-o partition" in action:
-        concat = f'{year} {",".join(output.split())}'
-        print(concat)
-        return concat
     return 0 if output == "" else int(output)
 
 
@@ -60,12 +56,14 @@ if __name__ == "__main__":
     ondemand_cpu_hours = []
     ondemand_gpu_hours = []
     partitions = []
+    
     for year in years:
 
         action = f"-o partition | sort | uniq"
         partitions.append(get_from_sacct(year, cluster, action))
         
         action = f"-o user {all_partitions} | sort | uniq | wc -l"
+        # action = f"-o user,alloctres {all_partitions} | grep gres/gpu=[1-9] | cut -d'|' -f1 | sort | uniq | wc -l"
         users.append(get_from_sacct(year, cluster, action))
 
         action = f"-o cputimeraw {cpu_partitions}" + " | awk '{sum += $1} END {print int(sum/3600)}'"
@@ -79,6 +77,7 @@ if __name__ == "__main__":
             gpu_users.append(get_from_sacct(year, cluster, action))
 
             action = f"-o user,jobname {all_partitions} | grep sys/dashboard | cut -d'|' -f1 | sort | uniq | wc -l"
+            # action = f"-o user,alloctres,jobname {all_partitions} | grep gres/gpu=[1-9] | grep sys/dashboard | cut -d'|' -f1 | sort | uniq | wc -l"
             ondemand_users.append(get_from_sacct(year, cluster, action))
 
             action = f"-o cputimeraw,jobname {cpu_partitions}" + " | grep sys/dashboard | awk -F',' '{sum += $1} END {print int(sum/3600)}'"
@@ -245,6 +244,36 @@ if __name__ == "__main__":
             plt.ylabel("GPU-Hours / GPU-Hours Avail.")
             plt.xticks(years, map(str, years))
             cluster = "tigergpu"
+
+    elif cluster == "della":
+        nrows = 2
+        ncols = 3
+
+        fig = plt.figure(figsize=(12, 5))
+        plt.subplot(nrows, ncols, 1)
+        plt.plot(years, users, 'o', **opts)
+        plt.xlabel("Year")
+        plt.ylabel("Number of Users")
+        plt.xticks(years, map(str, years))
+
+        plt.subplot(nrows, ncols, 2)
+        plt.plot(years, [x/1e6 for x in gpu_hours], 'o', **opts)
+        plt.xlabel("Year")
+        plt.ylabel("GPU-Hours / $10^6$")
+        plt.xticks(years, map(str, years))
+
+        plt.subplot(nrows, ncols, 3)
+        plt.plot(years, ondemand_users, 'o', **opts)
+        plt.xlabel("Year")
+        plt.ylabel("Number of OOD GPU Users")
+        plt.xticks(years, map(str, years))
+
+        plt.subplot(nrows, ncols, 4)
+        plt.plot(years,  [x / y for x, y in zip(ondemand_gpu_hours, gpu_hours)], 'o', **opts)
+        plt.xlabel("Year")
+        plt.ylabel("OOD GPU-Hours / GPU-Hours")
+        plt.xticks(years, map(str, years))
+        cluster = "della_gpu"
 
     plt.tight_layout()
     plt.savefig(f"{cluster}_history.png", dpi=200)
