@@ -77,7 +77,7 @@ elif host == "adroit":
   partition = ""
   qos_test = ["test", "gpu-test"]
 elif host == "della":
-  partition = "--partition cpu,datascience,physics"
+  partition = "--partition cpu"
   #partition = "--partition cpu,datascience,gpu,physics"  # for other versus ondemand
   qos_test = ["test"]
 elif host == "della-gpu":
@@ -121,6 +121,7 @@ else:
   print(f"\nRunning on {host} over all partitions\n")
 
 fname = f"{host}_sacct_{start_date}_{end_date}.csv".replace(":","-")
+# fname = "della_cpu.csv"
 cols = ["jobid", "netid", "account", "partition", "cpu-seconds", "elapsedraw", "alloctres", "start", "eligible", "qos", "state", "jobname"]
 if test_case:
   # create test input
@@ -149,12 +150,14 @@ elif not os.path.exists(fname):
   # export SLURM_TIME_FORMAT="%s"
   # sacct -a -X -P -n -S 2023-01-01T00:00:00 -E 2023-05-31T23:59:59 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,datascience,physics > chunk1.csv
   # sacct -a -X -P -n -S 2023-06-01T00:00:00 -E 2023-10-18T12:00:00 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,datascience,physics > chunk2.csv
-  # cat chunk1.csv chunk2.csv > della_cpu.csv
+  # cat chunk1.csv chunk2.csv | grep '|cpu|' > della_cpu.csv  # without the grep can have a line like "M101s"
   # then add next line as first line in della_cpu.csv
   # jobid|netid|account|partition|cpu-seconds|elapsedraw|alloctres|start|eligible|qos|state|jobname
   # watch out for "|" characters in jobname -- may need to trim lines where these exist
+  # pandas.errors.ParserError: Error tokenizing data. C error: Expected 12 fields in line 4761522, saw 14
   # need to remove jobs that exist in both chunk1 and chunk2
-  # set fname to della_cpu.csv above then read that in below: df = pd.read_csv(fname, sep="|", low_memory=False)
+  # set fname to della_cpu.csv above
+  # we ignore jobs with combined partitions like "cpu,physics"
   ### DELLA (CPU) ###
 
   # if encounter "UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 127525840: invalid start byte"
@@ -171,8 +174,24 @@ elif not os.path.exists(fname):
 else:
   print("\nUsing sacct cache file.\n")
 
-#df = pd.read_csv(fname, sep="|", low_memory=False)
-df = pd.read_csv(fname, low_memory=False)
+if fname == "della_cpu.csv":
+    with open(fname, "r") as f:
+        lines = f.readlines()
+    if lines != [] and lines[-1] == "": lines = lines[:-1]
+    df = pd.DataFrame([line.split("|")[:len(cols)] for line in lines])
+    df.columns = cols
+    #df = pd.read_csv(fname, sep="|", low_memory=False)
+    before = df.shape[0]
+    df = df.drop_duplicates()
+    if (before - df.shape[0] > 0):
+        print(f"Removed {before - df.shape[0]} duplicate rows.")
+    # fix types
+    df["cpu-seconds"] = pd.to_numeric(df["cpu-seconds"], downcast='integer')
+    df["elapsedraw"]  = pd.to_numeric(df["elapsedraw"], downcast='integer')
+    df["start"]       = pd.to_numeric(df["start"], errors='coerce', downcast='integer')
+    df["eligible"]    = pd.to_numeric(df["eligible"], errors='coerce', downcast='integer')
+else:
+    df = pd.read_csv(fname, low_memory=False)
 df.info()
 print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
 
@@ -243,10 +262,10 @@ if host == "traverse":
 if host == "della" or host == "adroit":
   #print("Jobs with df.start == NaN", df[pd.isna(df.start)].shape[0])
   #df = df[pd.notna(df.start)]
-  df.start = df.start.fillna(-1)
-  print("Jobs with df.start == NaN and cpu-seconds > 0")
-  print(df[(df.start == -1) & (df["cpu-seconds"] > 0)])
-  assert df[(df.start == -1) & (df["cpu-seconds"] > 0)].shape[0] == 0
+  #df.start = df.start.fillna(-1)
+  print("Checking for jobs with df.start == NaN and cpu-seconds > 0 ...")
+  print(df[pd.isna(df.start) & (df["cpu-seconds"] > 0)])
+  assert df[pd.isna(df.start) & (df["cpu-seconds"] > 0)].shape[0] == 0
 #df["start"] = df["start"].astype("int64")
 
 # a small number of jobs have "Unknown" as eligible with non-null alloctres and state "COMPLETED"
@@ -255,7 +274,7 @@ if host == "della" or host == "adroit":
 ans = df[(df.eligible == "Unknown") & pd.notna(df.alloctres)].shape[0]
 print(f"Number of jobs with eligible == 'Unknown' and alloctres not NULL: {ans} ({round(100 * ans / df.shape[0])}%)\n")
 #df["eligible"] = df.apply(lambda row: row["eligible"] if row["eligible"] != "Unknown" else row["start"], axis='columns')
-df["eligible"] = df["eligible"].astype("int64")
+df["eligible"] = pd.to_numeric(df["eligible"], downcast='integer')
 print("\nTotal NaNs:", df.isnull().sum().sum(), "\n")
 df.info()
 print("")
