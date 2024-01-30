@@ -17,6 +17,10 @@ def get_from_sacct(year: str, cluster: str, action: str) -> int:
     output = output.stdout
     print(cmd)
     print(output)
+    if "-o partition" in action:
+        concat = f'{year} {",".join(output.split())}'
+        print(concat)
+        return concat
     return 0 if output == "" else int(output)
 
 
@@ -34,9 +38,10 @@ if __name__ == "__main__":
         cpu_partitions = "--partition=all"
         gpu_partitions = "--partition=all"
     elif cluster == "tiger2":
-        #all_partitions = "--partition=cpu,ext,serial"
+        # must add new for 2017 and all for 2017 and 2018
+        #all_partitions = "--partition=all,cpu,ext,new,serial"
         all_partitions = "--partition=gpu"
-        cpu_partitions = "--partition=cpu,ext,serial"
+        cpu_partitions = "--partition=all,cpu,ext,new,serial"
         gpu_partitions = "--partition=gpu"
     elif cluster == "stellar":
         all_partitions = "--partition=cimes"
@@ -54,7 +59,12 @@ if __name__ == "__main__":
     gpu_hours = []
     ondemand_cpu_hours = []
     ondemand_gpu_hours = []
+    partitions = []
     for year in years:
+
+        action = f"-o partition | sort | uniq"
+        partitions.append(get_from_sacct(year, cluster, action))
+        
         action = f"-o user {all_partitions} | sort | uniq | wc -l"
         users.append(get_from_sacct(year, cluster, action))
 
@@ -77,6 +87,7 @@ if __name__ == "__main__":
             action = f"-o elapsedraw,alloctres,jobname {gpu_partitions}" + " | grep sys/dashboard | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
             ondemand_gpu_hours.append(get_from_sacct(year, cluster, action))
 
+    print(partitions)
     print(years)
     print(users)
     print(gpu_users)
@@ -212,7 +223,8 @@ if __name__ == "__main__":
 
             plt.subplot(nrows, ncols, 3)
             avail = 408 * 40 * 365 * 24
-            plt.plot(years[2:], [x/avail for x in cpu_hours[2:]], 'o', **opts)
+            plt.plot(years[1:], [x/avail for x in cpu_hours[1:]], 'o', **opts)
+            plt.ylim(0.5, 1)
             plt.xlabel("Year")
             plt.ylabel("CPU-Hours / CPU-Hours Avail.")
             plt.xticks(years, map(str, years))
