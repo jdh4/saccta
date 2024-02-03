@@ -18,6 +18,22 @@ sys/dashboard/sys/rstudio\_server-generic/nodes
 
 Need to escape underscores in `adroit/adroit_state.tex` like "NODE_FAIL".
 
+## cryoem
+
+Run saccta.py from della-gpu with partition set to cryoem. Include tiger2 for old data.
+
+## Della OnDemand
+
+```
+ssh della
+export SLURM_TIME_FORMAT="%s"
+sacct -a -X -P -n -S 2023-01-01T00:00:00 -E 2023-06-30T23:59:59 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,gpu,datascience,mig,gputest,physics > chunk1.csv
+sacct -a -X -P -n -S 2023-07-01T00:00:00 -E 2023-12-31T23:59:59 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,gpu,datascience,mig,gputest,physics > chunk2.csv
+cat chunk1.csv chunk2.csv | grep billing > della_cpu.csv
+# set fname to "della_cpu.csv"
+python saccta.py
+```
+
 ## Other
 
 Adroit:
