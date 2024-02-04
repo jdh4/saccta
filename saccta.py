@@ -150,7 +150,7 @@ elif not os.path.exists(fname):
   # export SLURM_TIME_FORMAT="%s"
   # sacct -a -X -P -n -S 2023-01-01T00:00:00 -E 2023-05-31T23:59:59 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,datascience,physics > chunk1.csv
   # sacct -a -X -P -n -S 2023-06-01T00:00:00 -E 2023-10-18T12:00:00 -o jobid,user,account,partition,cputimeraw%25,elapsedraw%50,alloctres%75,start,eligible,qos,state,jobname  --partition cpu,datascience,physics > chunk2.csv
-  # cat chunk1.csv chunk2.csv | grep '|cpu|' > della_cpu.csv  # without the grep can have a line like "M101s"
+  # cat chunk1.csv chunk2.csv | grep '|cpu|' | sort | uniq > della_cpu.csv  # without the grep can have a line like "M101s"
   # then add next line as first line in della_cpu.csv
   # jobid|netid|account|partition|cpu-seconds|elapsedraw|alloctres|start|eligible|qos|state|jobname
   # watch out for "|" characters in jobname -- may need to trim lines where these exist
