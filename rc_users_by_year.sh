@@ -3,10 +3,16 @@
 # This script computes the number of unique active users on the RC clusters. Numbers
 # are calculated for (1) the large clusters and (2) the large clusters plus adroit.
 # One should find the number of clusters for given year and then check to see
-# if there are valid jobs associated with each cluster.
+# if there are valid jobs associated with each cluster:
+
 # sacct -L -a -X -n -S 2017-01-01 -E 2017-12-31 -o cluster | sort | uniq
+
 # One must include the jobid for cpu-hours and gpu-hours to drop the duplicate
 # entries that arise from jobs that span two time windows.
+
+# The output files of this script are read by
+# https://github.com/jdh4/saccta/blob/main/total_sponsors_by_year.py
+
 
 declare -A clusters
 clusters[2017]="della,perseus,tiger,tiger2,tukey"
@@ -16,6 +22,14 @@ clusters[2020]="della,eddy,perseus,tiger2,traverse"
 clusters[2021]="della,eddy,perseus,stellar,tiger2,traverse"
 clusters[2022]="della,stellar,tiger2,traverse"
 clusters[2023]="della,stellar,tiger2,traverse"
+
+# next 6 lines needed to find total number of sponsors (which can be cluster specific)
+YEAR=2023
+user_cluster=user_cluster_${YEAR}
+sacct -M ${clusters[${YEAR}]} -a -X -n -P -S ${YEAR}-01-01 -E ${YEAR}-03-31 -o user,cluster | sort | uniq >  ${user_cluster}
+sacct -M ${clusters[${YEAR}]} -a -X -n -P -S ${YEAR}-04-01 -E ${YEAR}-06-30 -o user,cluster | sort | uniq >> ${user_cluster}
+sacct -M ${clusters[${YEAR}]} -a -X -n -P -S ${YEAR}-07-01 -E ${YEAR}-09-30 -o user,cluster | sort | uniq >> ${user_cluster}
+sacct -M ${clusters[${YEAR}]} -a -X -n -P -S ${YEAR}-10-01 -E ${YEAR}-12-31 -o user,cluster | sort | uniq >> ${user_cluster}
 
 for YEAR in {2017..2023}
 do
