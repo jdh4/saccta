@@ -48,7 +48,7 @@ def get_data_from_sacct(clusters: str,
     return df
 
 
-def send_email_html(text, addressee, subject="Cryoem GPU Usage", sender="halverson@princeton.edu"):
+def send_email_html(text, addressee, subject="GPU Usage", sender="halverson@princeton.edu"):
     """Send an email in HTML."""
     msg = EmailMessage()
     msg['Subject'] = subject
@@ -77,6 +77,14 @@ def format_output(d1: str, d2: str, pct: str, N: int, G: int, url: str) -> str:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Cryoem GPU Usage')
+    parser.add_argument('-M', '--clusters', type=str, default="della",
+                        help='Specify cluster(s) (e.g., --clusters=della,traverse)')
+    parser.add_argument('-r', '--partition', type=str, default="cryoem",
+                        help='Specify partition(s) (e.g., --partition=gpu,mig)')
+    parser.add_argument('-e', '--email', type=str, default=None,
+                        help='Email address of the recipient')
+    parser.add_argument('-s', '--subject', type=str, default="Cryoem GPU Usage",
+                        help='Subject of the email')
     parser.add_argument('--days',
                         type=int,
                         default=14,
@@ -85,19 +93,20 @@ if __name__ == "__main__":
     parser.add_argument('--gpus',
                         type=int,
                         default=152,
-                        metavar='G',
-                        choices=range(1, 153),
+                        metavar='N',
+                        choices=range(1, 1000),
                         help='Maximum number of GPUs available (default: 152)')
+    parser.add_argument('--no-correction', action='store_true', default=False,
+                        help='Do not apply correction to only include usage during time window and not before')
     args = parser.parse_args()
 
     # convert slurm timestamps to seconds
     os.environ["SLURM_TIME_FORMAT"] = "%s"
 
-    clusters = "della"
     start_date, end_date, elapsed_seconds = get_time_window(args.days)
-    partitions = "-r cryoem"
+    partitions = f"-r {args.partition}"
     fields = "alloctres,elapsedraw,start"
-    df = get_data_from_sacct(clusters, start_date, end_date, partitions, fields)
+    df = get_data_from_sacct(args.clusters, start_date, end_date, partitions, fields)
 
     # clean elapsedraw field
     df = df[pd.notna(df.elapsedraw)]
@@ -109,9 +118,9 @@ if __name__ == "__main__":
     df = df[df.start.str.isnumeric()]
     df.start = df.start.astype("int64")
 
-    # apply correction to only include the usage during the time window
-    correction = True
-    if correction:
+    # apply correction to only include the usage during the time window and not before
+    # the start of the window
+    if not args.no_correction:
         start_dt = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S")
         df["secs-from-start"] = df["start"] - start_dt.timestamp()
         df["secs-from-start"] = df["secs-from-start"].apply(lambda x: x if x < 0 else 0)
@@ -129,5 +138,6 @@ if __name__ == "__main__":
     url = "tiger: /home/jdh4/bin/cryoem/cryoem_gpu_usage.py"
     msg = format_output(start_date, end_date, percent_usage, args.days, args.gpus, url)
 
-    send_email_html(msg, "mcahn@princeton.edu")
-    send_email_html(msg, "halverson@princeton.edu")
+    send_email_html(msg, "halverson@princeton.edu", subject=args.subject)
+    if args.email:
+        send_email_html(msg, args.email, subject=args.subject)
