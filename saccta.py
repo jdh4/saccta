@@ -225,6 +225,12 @@ print(f"Number of jobs where start is 'Unknown' and cpu-seconds > 0: {num_unknow
 assert df.shape[0] == num_notnull + num_null + num_unknown
 print("df.eligible.min() = ", df.eligible.min())
 print("df.eligible.max() = ", df.eligible.max())
+
+if (df["start"].dtype == 'object'):
+    df = df[pd.notna(df.start)]
+    df = df[df.start.str.isnumeric()]
+    df.start = df.start.astype("int64")
+
 ans = df[df.start < df.eligible].shape[0]
 if ans:
     print(f"\nNumber of jobs with start < eligible: {ans} ({round(100 * ans / df.shape[0])}%)\n")
