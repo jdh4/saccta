@@ -121,7 +121,9 @@ else:
   print(f"\nRunning on {host} over all partitions\n")
 
 fname = f"{host}_sacct_{start_date}_{end_date}.csv".replace(":","-")
-# fname = "della_cpu.csv"
+if False:
+    print(fname)
+    sys.exit()
 cols = ["jobid", "netid", "account", "partition", "cpu-seconds", "elapsedraw", "alloctres", "start", "eligible", "qos", "state", "jobname"]
 if test_case:
   # create test input
@@ -153,10 +155,10 @@ elif not os.path.exists(fname):
   # cat chunk1.csv chunk2.csv | grep '|cpu|' | sort | uniq > della_cpu.csv  # without the grep can have a line like "M101s"
   # then add next line as first line in della_cpu.csv
   # jobid|netid|account|partition|cpu-seconds|elapsedraw|alloctres|start|eligible|qos|state|jobname
-  # watch out for "|" characters in jobname -- may need to trim lines where these exist
+  # watch out for "|" characters in jobname -- may need to trim lines where these exist (this is done below)
   # pandas.errors.ParserError: Error tokenizing data. C error: Expected 12 fields in line 4761522, saw 14
-  # need to remove jobs that exist in both chunk1 and chunk2
-  # set fname to della_cpu.csv above
+  # need to remove jobs that exist in both chunk1 and chunk2 using sort and uniq
+  # set fname to della_cpu.csv above and comment out subprocess call
   # we ignore jobs with combined partitions like "cpu,physics"
   ### DELLA (CPU) ###
 
@@ -185,6 +187,14 @@ if fname == "della_cpu.csv":
     df = df.drop_duplicates()
     if (before - df.shape[0] > 0):
         print(f"Removed {before - df.shape[0]} duplicate rows.")
+    
+    # next four lines will remove jobs with zero runtime
+    if False:
+        df = df[pd.notna(df.elapsedraw)]
+        df = df[df.elapsedraw.str.isnumeric()]
+        df.elapsedraw = df.elapsedraw.astype("int64")
+        df = df[df.elapsedraw > 0]
+
     # fix types
     df["cpu-seconds"] = pd.to_numeric(df["cpu-seconds"], downcast='integer')
     df["elapsedraw"]  = pd.to_numeric(df["elapsedraw"], downcast='integer')
@@ -659,6 +669,9 @@ def get_name_getent_passwd(netid):
         return fullname.split(",")[0]
       elif fullname.count(",") == 3 and fullname.endswith(",NONE,"):
         # Benjamin D Singer,Green Hall,NONE,
+        return fullname.split(",")[0]
+      elif fullname.count(",") == 3 and "Sharon Hammes-Schiffer" in fullname:
+        print(fullname, " --> ", fullname.split(",")[0])
         return fullname.split(",")[0]
       elif fullname.count(",") == 2:
         return fullname.split(",")[0]
