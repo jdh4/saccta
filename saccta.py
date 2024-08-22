@@ -837,6 +837,7 @@ def extract_lastname_from_fullname(s: str) -> str:
         return " ".join(names)
 
 def format_sponsor(s):
+  if s == "Jia Deng" or s == "Jie Deng": return s
   if (not s) or pd.isna(s): return s
   names = list(filter(lambda x: x not in ['Jr.', 'II', 'III', 'IV'], s.split()))
   if len(names) == 0:
