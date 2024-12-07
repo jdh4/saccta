@@ -34,6 +34,17 @@ cat chunk1.csv chunk2.csv | grep billing > della_cpu.csv
 python saccta.py
 ```
 
+## Number of Sponsors in 2024
+
+```
+jdh4@tiger3:~$ sacct -X -P -n -S 2024-01-01T00:00:00 -E now -a -o user,cluster | sort | uniq > netids_2024.tiger3
+jdh4@tiger3:~$ scp netids_2024.tiger3 tigergpu:
+
+$ sacct -M tiger2,traverse,stellar -X -P -n -S 2024-01-01T00:00:00 -E now -a -o user,cluster | sort | uniq > netids_2024.not_della
+$ sacct -M della -X -P -n -S 2024-01-01T00:00:00 -E 2024-05-01T00:00:00 -a -o user,cluster | sort | uniq > netids_2024.della1; sacct -M della -X -P -n -S 2024-05-01T00:00:00 -E 2024-10-01T00:00:00 -a -o user,cluster | sort | uniq > netids_2024.della2; sacct -M della -X -P -n -S 2024-10-01T00:00:00 -E now -a -o user,cluster | sort | uniq > netids_2024.della3
+$ cat netids_2024.not_della netids_2024.della1 netids_2024.della2 netids_2024.della3 netids_2024.tiger3 | sort | uniq > netids.2024
+```
+
 ## Other
 
 Adroit:
