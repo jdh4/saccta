@@ -28,8 +28,8 @@ from sponsor import get_full_name_from_ldap
 from sponsor import get_full_name_of_user_from_log
 from sponsor import get_sponsor_netid_of_user_from_log
 
-start_date = "2023-01-01T00:00:00"
-end_date   = "2023-12-31T23:59:59"
+start_date = "2024-01-01T00:00:00"
+end_date   = "2024-12-31T23:59:59"
 
 # generate latex files
 latex = True
@@ -309,6 +309,11 @@ if host == "stellar-intel":
   df = df[~df.account.str.contains('cimes')]
   print(f"\nRemoving jobs with cimes* account (excluded {before - df.shape[0]} jobs).\n")
 
+if not df[pd.isna(df.partition)].empty:
+    print("Jobs with null partition:")
+    print(df[pd.isna(df.partition)])
+    print("Dropping jobs with null partition ...")
+    df = df[~pd.isna(df.partition)]
 
 print("\nPartitions:", np.sort(df.partition.unique()))
 print("Accounts:", np.sort(df.account.unique()))
@@ -369,6 +374,10 @@ def is_gpu_job(tres):
   return 1 if "gres/gpu=" in tres and not "gres/gpu=0" in tres else 0
 
 df["gpus"] = df.alloctres.apply(gpus_per_job)
+# February 11, 2025 (added to reflect that cloud jobs allocate a GPU)
+if host == "adroit":
+    print(df[df.partition == "cloud"].alloctres.unique())
+    df["gpus"] = df.apply(lambda row: 1 if row["partition"] == "cloud" else row["gpus"], axis="columns")
 df["gpu-seconds"] = df.apply(lambda row: row["elapsedraw"] * row["gpus"], axis='columns')
 df["gpu-job"] = df.alloctres.apply(is_gpu_job)
 df["cpu-only-seconds"] = df.apply(lambda row: 0 if row["gpus"] else row["cpu-seconds"], axis="columns")
@@ -465,43 +474,43 @@ print("\n")
 
 # S T A T E
 df.state = df.state.apply(lambda x: "CANCELLED" if "CANCEL" in x else x)
-s = df[["netid", "state"]].copy()
-s = s.groupby("state").agg({"state":['first', np.size], "netid":lambda series: len(set(series))}).reset_index(drop=True)
-#s = s.reset_index(drop=True)
-s.columns = ["State", "Number of Jobs", "Number of Users"]
+s = df[["netid", "state", "cpu-hours"]].copy()
+s = s.groupby("state").agg({"state":['first', np.size], "netid":lambda series: len(set(series)), "cpu-hours":"sum"})
+s = s.reset_index(drop=True)
+s.columns = ["State", "Number of Jobs", "Number of Users", "CPU-Hours"]
 s = s.sort_values("Number of Jobs", ascending=False)
 s = add_proportion_in_parenthesis(s, "Number of Jobs", replace=True)
+s = add_proportion_in_parenthesis(s, "CPU-Hours", replace=True)
 print(s, end="\n\n")
 if latex:
   base = f"{host}_state"
   s.to_csv(f"{base}.csv")
   fname = f"{base}.tex"
   caption = (f"Breakdown of jobs by state on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by Job State")
-  s.to_latex(fname, index=False, caption=caption, column_format="rrc", label=f"{host}_state")
-  pad_multicolumn(fname, ["Number of Jobs"])
+  s.to_latex(fname, index=False, caption=caption, column_format="rrcr", label=f"{host}_state")
+  pad_multicolumn(fname, ["Number of Jobs", "CPU-Hours"])
 
 # P A R T I T I O N
-field  = "gpu-hours" if host in checkgpu_hosts else "cpu-hours"
-field2 = "GPU-Hours" if host in checkgpu_hosts else "CPU-Hours"
-q = df[["netid", "partition", field, "q-hours"]].copy()
-d = {"partition":np.size, field:np.sum, "q-hours":[np.sum, 'median'], "netid":lambda series: len(set(series))}
+q = df[["netid", "partition", "cpu-hours", "gpu-hours", "q-hours"]].copy()
+d = {"partition":"size", "cpu-hours":"sum", "gpu-hours":"sum", "q-hours":["sum", 'median'], "netid":lambda series: len(set(series))}
 q = q.groupby("partition").agg(d)
-q.columns = ["Number of Jobs", field2, "Q-Hours", "Median Q-Hours per Job", "Number of Users"]
+q.columns = ["Number of Jobs", "CPU-Hours", "GPU-Hours", "Q-Hours", "Median Q-Hours per Job", "Number of Users"]
 q["Partition"] = q.index
 q["Median Q-Hours per Job"] = q["Median Q-Hours per Job"].apply(lambda x: round(x, 1))
-q = q.sort_values(field2, ascending=False)
+q = q.sort_values("CPU-Hours", ascending=False)
 q = add_proportion_in_parenthesis(q, "Number of Jobs", replace=True)
-q = add_proportion_in_parenthesis(q, field2, replace=True)
+q = add_proportion_in_parenthesis(q, "CPU-Hours", replace=True)
+q = add_proportion_in_parenthesis(q, "GPU-Hours", replace=True)
 q = add_proportion_in_parenthesis(q, "Q-Hours", replace=True)
-q = q[["Partition", field2, "Number of Users", "Number of Jobs", "Q-Hours"]].reset_index(drop=True)
+q = q[["Partition", "CPU-Hours", "GPU-Hours", "Number of Users", "Number of Jobs", "Q-Hours"]].reset_index(drop=True)
 print(q, end="\n\n")
 if latex:
   base = f"{host}_partition"
   q.to_csv(f"{base}.csv")
   fname = f"{base}.tex"
   caption = (f"Breakdown of jobs by partition on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by Partition")
-  q.to_latex(fname, index=False, caption=caption, column_format="rrcrrc", label=f"{host}_partition")
-  pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", field2])
+  q.to_latex(fname, index=False, caption=caption, column_format="rrrcrr", label=f"{host}_partition")
+  pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours", "GPU-Hours"])
 
 # O N D E M A N D
 if (host in ondemand_hosts) and ("gpu" in df.partition.unique().tolist()):
@@ -1010,9 +1019,9 @@ if host in ("adroit"):
     pairs = add_proportion_in_parenthesis(pairs, "cpu-hours", replace=False)
     pairs = add_proportion_in_parenthesis(pairs, "gpu-hours", replace=False)
     pairs = add_proportion_in_parenthesis(pairs, "gpu-job", replace=True)
-    pairs = add_proportion_in_parenthesis(pairs, "Total Jobs", replace=True)
+    #pairs = add_proportion_in_parenthesis(pairs, "Total Jobs", replace=True)
     pairs = add_proportion_in_parenthesis(pairs, "CPU Jobs", replace=True)
-    pairs = add_proportion_in_parenthesis(pairs, "q-hours", replace=True)
+    #pairs = add_proportion_in_parenthesis(pairs, "q-hours", replace=True)
 else:
     pairs = add_proportion_in_parenthesis(pairs, "gpu-job", replace=False)
     pairs = add_proportion_in_parenthesis(pairs, "gpu-hours", replace=False)
@@ -1082,7 +1091,7 @@ if host in checkgpu_hosts:
       pad_multicolumn(fname, ["GPU Jobs", "GPU-Hours", "Q-Hours"])
 else:
   if host == "adroit":
-    users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "CPU-Hours", "Total Jobs", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
+    users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "CPU-Hours", "Total Jobs", "GPU-Hours", "Q-Hours"]]
     users["Q-Hours"] = users["Q-Hours"].apply(round)
   elif (host == "stellar-amd" and partition == "--partition gpu"):
     users = users[["NetID", "Name", "Position", "User Dept", "Partitions", "Account", "GPU-Hours", "GPU Jobs", "Q-Hours"]]
