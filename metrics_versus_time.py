@@ -17,18 +17,21 @@ def get_from_sacct(year: str, cluster: str, action: str) -> int:
     output = output.stdout
     print(cmd)
     print(output)
-    return 0 if output == "" else int(output)
+    if output == "":
+        return 0
+    else:
+        if output.strip().isnumeric():
+            return int(output.strip())
+        return output
 
 
 if __name__ == "__main__":
 
     cluster = "adroit"
     if cluster == "adroit":
-        # ignoring cloud partition
-        # including gpu partition in total cpu-hours (see cpu_partitions)
-        all_partitions = "--partition=all,class,gpu"
-        cpu_partitions = "--partition=all,class,gpu"
-        gpu_partitions = "--partition=gpu"
+        all_partitions = "--partition=all,class,cloud,gpu"
+        cpu_partitions = "--partition=all,class,cloud,gpu"
+        gpu_partitions = "--partition=cloud,gpu"
     elif cluster == "traverse":
         all_partitions = "--partition=all"
         cpu_partitions = "--partition=all"
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         cpu_partitions = "--partition=cimes"
         gpu_partitions = "--partition=gpu"
 
-    years = range(2018, 2024)
+    years = range(2018, 2025)
     users = []
     gpu_users = []
     ondemand_users = []
@@ -69,8 +72,13 @@ if __name__ == "__main__":
         action = f"-o cputimeraw {cpu_partitions}" + " | awk '{sum += $1} END {print int(sum/3600)}'"
         cpu_hours.append(get_from_sacct(year, cluster, action))
 
-        action = f"-o elapsedraw,alloctres {gpu_partitions}" + " | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
-        gpu_hours.append(get_from_sacct(year, cluster, action))
+        ### GPU-HOURS ###
+        action = f"-o elapsedraw,alloctres {gpu_partitions}" + r" | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
+        if cluster == "adroit":
+            cloud = {2018:0, 2019:0, 2020:0, 2021:0, 2022:0, 2023:6, 2024:10241}
+            gpu_hours.append(get_from_sacct(year, cluster, action) + cloud[year])
+        else:
+            gpu_hours.append(get_from_sacct(year, cluster, action))
 
         if cluster == "adroit" or cluster == "stellar":
             action = f"-o user {gpu_partitions} | sort | uniq | wc -l"
@@ -83,8 +91,12 @@ if __name__ == "__main__":
             action = f"-o cputimeraw,jobname {cpu_partitions}" + " | grep sys/dashboard | awk -F',' '{sum += $1} END {print int(sum/3600)}'"
             ondemand_cpu_hours.append(get_from_sacct(year, cluster, action))
 
-            action = f"-o elapsedraw,alloctres,jobname {gpu_partitions}" + " | grep sys/dashboard | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
-            ondemand_gpu_hours.append(get_from_sacct(year, cluster, action))
+            action = f"-o elapsedraw,alloctres,jobname {gpu_partitions}" + r" | grep sys/dashboard | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
+            if cluster == "adroit":
+                cloud = {2018:0, 2019:0, 2020:0, 2021:0, 2022:0, 2023:6, 2024:10241}
+                ondemand_gpu_hours.append(get_from_sacct(year, cluster, action) + cloud[year])
+            else:
+                ondemand_gpu_hours.append(get_from_sacct(year, cluster, action))
 
     print(partitions)
     print(years)
