@@ -500,7 +500,11 @@ q["Median Q-Hours per Job"] = q["Median Q-Hours per Job"].apply(lambda x: round(
 q = q.sort_values("CPU-Hours", ascending=False)
 q = add_proportion_in_parenthesis(q, "Number of Jobs", replace=True)
 q = add_proportion_in_parenthesis(q, "CPU-Hours", replace=True)
-q = add_proportion_in_parenthesis(q, "GPU-Hours", replace=True)
+gpu_hrs_sum = q["GPU-Hours"].sum()
+if gpu_hrs_sum > 0:
+    q = add_proportion_in_parenthesis(q, "GPU-Hours", replace=True)
+else:
+    q["GPU-Hours"] = q["GPU-Hours"].astype("int64")
 q = add_proportion_in_parenthesis(q, "Q-Hours", replace=True)
 q = q[["Partition", "CPU-Hours", "GPU-Hours", "Number of Users", "Number of Jobs", "Q-Hours"]].reset_index(drop=True)
 print(q, end="\n\n")
@@ -510,7 +514,9 @@ if latex:
   fname = f"{base}.tex"
   caption = (f"Breakdown of jobs by partition on {caption_host} from {date_range}.",  f"{caption_host} -- Utilization by Partition")
   q.to_latex(fname, index=False, caption=caption, column_format="rrrcrr", label=f"{host}_partition")
-  pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours", "GPU-Hours"])
+  if gpu_hrs_sum > 0:
+      pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours", "GPU-Hours"])
+  pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours"])
 
 # O N D E M A N D
 if (host in ondemand_hosts) and ("gpu" in df.partition.unique().tolist()):
