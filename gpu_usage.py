@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
     start_date, end_date, elapsed_seconds = get_time_window(args.days)
     partitions = f"-r {args.partition}"
-    fields = "user,account,alloctres,elapsedraw,start"
+    fields = "user,account,alloctres,elapsedraw,start,partition"
     df = get_data_from_sacct(args.clusters, start_date, end_date, partitions, fields)
 
     # clean elapsedraw field
@@ -138,21 +138,26 @@ if __name__ == "__main__":
     url = "della: /home/jdh4/bin/gpu_usage.py"
     msg = format_output(start_date, end_date, percent_usage, args.days, args.gpus, url)
 
+    def unique_list(series):
+        return ",".join(sorted(set(series)))
+
     # by-user
     df["gpu-hours"] = round(df["gpu-seconds"] / 3600)
-    d = {"account":lambda series: ",".join(sorted(set(series))), "gpu-hours":"sum"}
+    d = {"account":unique_list, "partition":unique_list, "gpu-hours":"sum"}
     gp = df.groupby("user").agg(d).sort_values("gpu-hours", ascending=False)
     gp.reset_index(drop=False, inplace=True)
     gp.index += 1
+    gp.account = gp.account.apply(lambda a: f"{a[:24]}+" if len(a) > 24 else a)
     # note that gpu-hours have been rounded at this point
     gp["proportion(%)"] = gp["gpu-hours"] / gp["gpu-hours"].sum()
     gp["proportion(%)"] = round(100 * gp["proportion(%)"])
     gp["proportion(%)"] = gp["proportion(%)"].astype("int32")
     gp["gpu-hours"] = gp["gpu-hours"].astype("int32")
+    gp.columns = ["USER", "ACCOUNT", "PARTITION", "GPU-HOURS", "PROPORTION(%)"]
 
-    msg += "\n\n" + gp.to_string()
+    msg += "\n\n\n" + gp.to_string()
     print(msg)
 
-    #send_email_html(msg, "halverson@princeton.edu", subject=args.subject)
+    send_email_html(msg, "halverson@princeton.edu", subject=args.subject)
     if args.email:
         send_email_html(msg, args.email, subject=args.subject)
