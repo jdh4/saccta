@@ -76,7 +76,7 @@ def format_output(d1: str, d2: str, pct: str, N: int, G: int, url: str) -> str:
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Cryoem GPU Usage')
+    parser = argparse.ArgumentParser(description='GPU Usage')
     parser.add_argument('-M', '--clusters', type=str, default="della",
                         help='Specify cluster(s) (e.g., --clusters=della,traverse)')
     parser.add_argument('-r', '--partition', type=str, default="cryoem",
@@ -85,6 +85,8 @@ if __name__ == "__main__":
                         help='Email address of the recipient')
     parser.add_argument('-s', '--subject', type=str, default="Cryoem GPU Usage",
                         help='Subject of the email')
+    parser.add_argument('-o', '--output', action='store_true', default=False,
+                        help='Print output')
     parser.add_argument('--days',
                         type=int,
                         default=14,
@@ -156,7 +158,8 @@ if __name__ == "__main__":
     gp.columns = ["USER", "ACCOUNT", "PARTITION", "GPU-HOURS", "PROPORTION(%)"]
 
     msg += "\n\n\n" + gp.to_string()
-    print(msg)
+    if args.output:
+        print(msg)
 
     send_email_html(msg, "halverson@princeton.edu", subject=args.subject)
     if args.email:
