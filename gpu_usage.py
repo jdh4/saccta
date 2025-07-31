@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     # add columns
     df["gpus"] = df.alloctres.apply(gpus_per_job)
-    df["gpu-seconds"] = df.apply(lambda row: row["elapsedraw"] * row["gpus"], axis='columns')
+    df["gpu-seconds"] = df["elapsedraw"] * df["gpus"]
 
     max_gpu_seconds = elapsed_seconds * args.gpus
     used_over_available = df["gpu-seconds"].sum() / max_gpu_seconds
