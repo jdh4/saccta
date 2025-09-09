@@ -156,8 +156,19 @@ if __name__ == "__main__":
     gp["proportion(%)"] = gp["proportion(%)"].astype("int32")
     gp["gpu-hours"] = gp["gpu-hours"].astype("int32")
     gp.columns = ["USER", "ACCOUNT", "PARTITION", "GPU-HOURS", "PROPORTION(%)"]
-
     msg += "\n\n\n" + gp.to_string()
+
+    if "pli" in args.subject.lower():
+        d = {"gpu-hours":"sum"}
+        by_partition = df.groupby("partition").agg(d).sort_values("gpu-hours", ascending=False)
+        by_partition.reset_index(drop=False, inplace=True)
+        by_partition["proportion(%)"] = by_partition["gpu-hours"] / by_partition["gpu-hours"].sum()
+        by_partition["proportion(%)"] = round(100 * by_partition["proportion(%)"])
+        by_partition["proportion(%)"] = by_partition["proportion(%)"].astype("int32")
+        by_partition["gpu-hours"] = by_partition["gpu-hours"].astype("int32")
+        by_partition.columns = ["PARTITION", "GPU-HOURS", "PROPORTION(%)"]
+        msg += "\n\n\n" + by_partition.to_string(index=False)
+    
     if args.output:
         print(msg)
 
