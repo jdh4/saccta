@@ -1,4 +1,19 @@
-#!/usr/licensed/anaconda3/2024.10/bin/python -uB
+#!/usr/licensed/anaconda3/2025.6/bin/python -uB
+
+###############################################################################
+#                          D O C U M E N T A T I O N
+###############################################################################
+#
+#  Start by viewing the help menu:
+#
+#      $ ./gpu_usage.py --help
+#
+#  Sample usage:
+#
+#      $ ./gpu_usage.py -M della -r cryoem --gpus=148 --days=7 -o
+#
+###############################################################################
+
 
 import os
 import re
@@ -9,6 +24,8 @@ from datetime import datetime
 from datetime import timedelta
 from email.message import EmailMessage
 import pandas as pd
+from efficiency import get_stats_dict
+from efficiency import gpu_efficiency
 
 
 def get_time_window(num_days: int) -> tuple[str, str, int]:
@@ -82,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--partition', type=str, default="cryoem",
                         help='Specify partition(s) (e.g., --partition=gpu,mig)')
     parser.add_argument('-e', '--email', type=str, default=None,
-                        help='Email address of the recipient')
+                        help='Comma-separated list of recipient email addresses')
     parser.add_argument('-s', '--subject', type=str, default="Cryoem GPU Usage",
                         help='Subject of the email')
     parser.add_argument('-o', '--output', action='store_true', default=False,
@@ -107,7 +124,7 @@ if __name__ == "__main__":
 
     start_date, end_date, elapsed_seconds = get_time_window(args.days)
     partitions = f"-r {args.partition}"
-    fields = "user,account,alloctres,elapsedraw,start,partition"
+    fields = "jobid,cluster,user,account,alloctres,elapsedraw,start,partition,admincomment"
     df = get_data_from_sacct(args.clusters, start_date, end_date, partitions, fields)
 
     # clean elapsedraw field
@@ -119,6 +136,9 @@ if __name__ == "__main__":
     df = df[pd.notna(df.start)]
     df = df[df.start.str.isnumeric()]
     df.start = df.start.astype("int64")
+    # clean admincomment (jobstats summary statistics)
+    df["admincomment"] = df["admincomment"].apply(get_stats_dict)
+    df = df[df.admincomment != {}]
 
     # apply correction to only include the usage during the time window and not before
     # the start of the window
@@ -131,6 +151,20 @@ if __name__ == "__main__":
     # add columns
     df["gpus"] = df.alloctres.apply(gpus_per_job)
     df["gpu-seconds"] = df["elapsedraw"] * df["gpus"]
+    df["gpu-tuple"] = df.apply(lambda row:
+                               gpu_efficiency(row["admincomment"],
+                                              row["elapsedraw"],
+                                              row["jobid"],
+                                              row["cluster"],
+                                              single=True,
+                                              verbose=False),
+                                              axis="columns")
+    cols = ["gpu-util(%)", "gpu-error-code"]
+    df[cols] = pd.DataFrame(df["gpu-tuple"].tolist(), index=df.index)
+    df = df[df["gpu-error-code"] == 0]
+
+    # GPU utilization is available for each job but not used below
+    print(df[["jobid", "cluster", "user", "gpu-util(%)"]].head(20), "\n")
 
     max_gpu_seconds = elapsed_seconds * args.gpus
     used_over_available = df["gpu-seconds"].sum() / max_gpu_seconds
@@ -172,6 +206,6 @@ if __name__ == "__main__":
     if args.output:
         print(msg)
 
-    send_email_html(msg, "halverson@princeton.edu", subject=args.subject)
     if args.email:
-        send_email_html(msg, args.email, subject=args.subject)
+        for email in args.emails.split(","):
+            send_email_html(msg, email, subject=args.subject)
