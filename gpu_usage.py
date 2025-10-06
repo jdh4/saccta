@@ -65,7 +65,10 @@ def get_data_from_sacct(clusters: str,
     return df
 
 
-def send_email_html(text, addressee, subject="GPU Usage", sender="halverson@princeton.edu"):
+def send_email_html(text: str,
+                    addressee: str,
+                    sender: str,
+                    subject: str="GPU Usage") -> None:
     """Send an email in HTML."""
     msg = EmailMessage()
     msg['Subject'] = subject
@@ -76,7 +79,7 @@ def send_email_html(text, addressee, subject="GPU Usage", sender="halverson@prin
     msg.set_content(html, subtype="html")
     with smtplib.SMTP('localhost') as s:
         s.send_message(msg)
-
+        
 
 def format_output(d1: str, d2: str, pct: str, N: int, G: int, url: str) -> str:
     """Prepare the results for the email message."""
@@ -104,11 +107,13 @@ if __name__ == "__main__":
                         help='Subject of the email')
     parser.add_argument('-o', '--output', action='store_true', default=False,
                         help='Print output')
+    parser.add_argument('--sender', type=str, default=None,
+                        help='Specify the email addresss of the sender')
     parser.add_argument('--days',
                         type=int,
-                        default=14,
+                        default=7,
                         metavar='N',
-                        help='Start date is N previous days from today (default: 14)')
+                        help='Start date is N previous days from today (default: 7)')
     parser.add_argument('--gpus',
                         type=int,
                         default=152,
@@ -207,5 +212,8 @@ if __name__ == "__main__":
         print(msg)
 
     if args.email:
-        for email in args.emails.split(","):
-            send_email_html(msg, email, subject=args.subject)
+        if not args.sender:
+            print("Use --sender to specify your email address. No emails sent."
+        else:
+            for email in args.emails.split(","):
+                send_email_html(msg, email, sender=args.sender, subject=args.subject)
