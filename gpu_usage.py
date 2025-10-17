@@ -213,7 +213,7 @@ if __name__ == "__main__":
 
     if args.email:
         if not args.sender:
-            print("Use --sender to specify your email address. No emails sent."
+            print("Use --sender to specify your email address. No emails sent.")
         else:
             for email in args.emails.split(","):
                 send_email_html(msg, email, sender=args.sender, subject=args.subject)
