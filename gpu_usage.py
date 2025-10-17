@@ -108,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output', action='store_true', default=False,
                         help='Print output')
     parser.add_argument('--sender', type=str, default=None,
-                        help='Specify the email addresss of the sender')
+                        help='Specify the email address of the sender')
     parser.add_argument('--days',
                         type=int,
                         default=7,
