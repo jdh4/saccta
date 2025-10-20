@@ -79,7 +79,7 @@ def send_email_html(text: str,
     msg.set_content(html, subtype="html")
     with smtplib.SMTP('localhost') as s:
         s.send_message(msg)
-        
+
 
 def format_output(d1: str, d2: str, pct: str, N: int, G: int, url: str) -> str:
     """Prepare the results for the email message."""
@@ -101,7 +101,7 @@ if __name__ == "__main__":
                         help='Specify cluster(s) (e.g., --clusters=della,traverse)')
     parser.add_argument('-r', '--partition', type=str, default="cryoem",
                         help='Specify partition(s) (e.g., --partition=gpu,mig)')
-    parser.add_argument('-e', '--email', type=str, default=None,
+    parser.add_argument('-e', '--emails', type=str, default=None,
                         help='Comma-separated list of recipient email addresses')
     parser.add_argument('-s', '--subject', type=str, default="Cryoem GPU Usage",
                         help='Subject of the email')
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     if args.output:
         print(msg)
 
-    if args.email:
+    if args.emails:
         if not args.sender:
             print("Use --sender to specify your email address. No emails sent.")
         else:
