@@ -115,7 +115,7 @@ Encountered when including jobname on della (cpu).
 UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 127525840: invalid start byte
 ```
 
-## crontab (July 1, 2025)
+## crontab (January 27, 2026)
 
 ```
 SHELL=/bin/bash
