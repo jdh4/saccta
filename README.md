@@ -120,9 +120,11 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0x8b in position 127525840: 
 ```
 SHELL=/bin/bash
 #SHELL=/bin/false
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 MAILTO=halverson@princeton.edu
 JDS=/home/jdh4/software/JDS/job_defense_shield/jds-env/bin
-CFG=/home/jdh4/software/JDS/della_plus_jds/princeton.yaml
+JDS=/home/jdh4/.conda/envs/jds-junk/bin
+CFG=/home/jdh4/software/JDS/forrestal_shield/princeton.yaml
 LOG=/home/jdh4/software/JDS/log
 PLI=pli,pli-c,pli-p,pli-lc
 
@@ -134,8 +136,9 @@ PLI=pli,pli-c,pli-p,pli-lc
 ###############
 ## gpu usage ##
 ###############
-0 8 * * 1 /home/jdh4/bin/gpu_usage.py -M della -r ${PLI} --gpus=336 --days=7 -s "PLI GPU Usage" -e kl5675@princeton.edu
-0 8 14,28 * * /home/jdh4/bin/gpu_usage.py -M della -r cryoem --gpus=148 --days=7 -s "Cryoem GPU Usage" -e mcahn@princeton.edu
+0 8 * * 1 /home/jdh4/bin/gpu_usage.py -M della -r ${PLI} --gpus=336 --days=7 -s "PLI GPU Usage" -e ${MAILTO} --sender=${MAILTO}
+0 8 * * 1 ssh tiger3 '/home/jdh4/bin/gpu_usage.py -M tiger3 -r gpu --gpus=48 --days=7 -s "Tiger H100 Usage" -e halverson@princeton.edu' --sender=${MAILTO}
+0 8 14,28 * * /home/jdh4/bin/gpu_usage.py -M della -r cryoem --gpus=128 --days=7 -s "Cryoem GPU Usage" -e mcahn@princeton.edu,${MAILTO} --sender=${MAILTO}
 
 #############
 ## gpudash ##
@@ -146,26 +149,28 @@ PLI=pli,pli-c,pli-p,pli-lc
 #########
 ## lft ##
 #########
-0 8,11,14,17 * * 1-5 /projects/j/jdh4/python-devel/lft/cron/clusters_ls_home.sh > /dev/null 2>&1
+0 8,11,14,17 * * 1-5 /projects/CSES/jdh4/python-devel/lft/cron/clusters_ls_home.sh > /dev/null 2>&1
 
 #############
 ## name2id ##
 #############
-0 8,11,14,17 * * 1-5 /projects/j/jdh4/python-devel/name2id/cron/clusters_getent_passwd.sh > /dev/null 2>&1
+0 8,11,14,17 * * 1-5 /projects/CSES/jdh4/python-devel/name2id/cron/clusters_getent_passwd.sh > /dev/null 2>&1
 
 ########################
 ## job defense shield ##
 ########################
-#*/15 * * * * ${JDS}/job_defense_shield --config-file=${CFG} --email --cancel-zero-gpu-jobs -M della -r gpu,${PLI} --no-emails-to-users > ${LOG}/cancel.log 2>&1
-00  9 * * 1-5 ssh tiger3 '/home/jdh4/bin/job_defense_shield/jds_external_tiger/cluster_report.sh'
-00  9 * * 1-5 /home/jdh4/bin/cluster_report.sh
-10  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --zero-util-gpu-hours -M della,stellar -r gpu,${PLI} > ${LOG}/zero_util_gpu_hours.log 2>&1
-20  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --low-gpu-efficiency -M della,stellar -r gpu,${PLI} > ${LOG}/low_gpu_efficiency.log 2>&1
-30  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --too-much-cpu-mem-per-gpu -M della,stellar -r gpu,${PLI} > ${LOG}/too_much_cpu_mem_per_gpu.log 2>&1
-40  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --too-many-cores-per-gpu -M della,stellar -r gpu,${PLI} > ${LOG}/too_many_cores_per_gpu.log 2>&1
-50  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --multinode-gpu-fragmentation -M della -r gpu,${PLI} > ${LOG}/multinode_gpu_fragmentation.log 2>&1
+#*/15 * * * * ${JDS}/job_defense_shield --config-file=${CFG} --email --cancel-zero-gpu-jobs -M della -r gpu,pli-c --no-emails-to-users >> ${LOG}/cancel.log 2>&1
+00  9 * * 1-5 ssh tiger3 '/home/jdh4/bin/job_defense_shield/colo_shield/send_emails_and_report.sh'
+00  9 * * 1-5 /home/jdh4/software/JDS/forrestal_shield/cluster_report.sh
+00  9 * * 5 /home/jdh4/software/JDS/forrestal_shield/cluster_report_pli.sh
+00  9 * * 5 /home/jdh4/software/JDS/forrestal_shield/cluster_report_ailab.sh
+10  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --zero-util-gpu-hours -M della,stellar -r gpu,ailab,${PLI} > ${LOG}/zero_util_gpu_hours.log 2>&1
+20  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --low-gpu-efficiency -M della,stellar -r gpu,ailab,${PLI} > ${LOG}/low_gpu_efficiency.log 2>&1
+30  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --too-much-cpu-mem-per-gpu -M della,stellar -r gpu,ailab,${PLI} > ${LOG}/too_much_cpu_mem_per_gpu.log 2>&1
+40  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --too-many-cores-per-gpu -M della,stellar -r gpu,ailab,${PLI} > ${LOG}/too_many_cores_per_gpu.log 2>&1
+50  9 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --multinode-gpu-fragmentation -M della -r gpu,ailab,${PLI} > ${LOG}/multinode_gpu_fragmentation.log 2>&1
 00 10 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --gpu-model-too-powerful -M della -r gpu > ${LOG}/gpu_model_too_powerful.log 2>&1
-10 10 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --excessive-time-gpu -M della -r gpu,${PLI} > ${LOG}/excessive_time_gpu.log 2>&1
+10 10 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --excessive-time-gpu -M della -r gpu,ailab,${PLI} > ${LOG}/excessive_time_gpu.log 2>&1
 20 10 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --zero-cpu-utilization --days=3 > ${LOG}/zero_cpu.log 2>&1
 30 10 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --excess-cpu-memory -M della -r cpu > ${LOG}/excess_memory.log 2>&1
 40 10 * * 1-5 ${JDS}/job_defense_shield --config-file=${CFG} --email --low-cpu-efficiency > ${LOG}/low_cpu_efficiency.log 2>&1
