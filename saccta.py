@@ -516,7 +516,8 @@ if latex:
   q.to_latex(fname, index=False, caption=caption, column_format="rrrcrr", label=f"{host}_partition")
   if gpu_hrs_sum > 0:
       pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours", "GPU-Hours"])
-  pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours"])
+  else:
+      pad_multicolumn(fname, ["Number of Jobs", "Q-Hours", "CPU-Hours"])
 
 # O N D E M A N D
 if (host in ondemand_hosts) and ("gpu" in df.partition.unique().tolist()):
