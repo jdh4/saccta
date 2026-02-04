@@ -3,6 +3,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+
 def get_from_sacct(year: str, cluster: str, action: str) -> int:
     """Return the output of the command as an integer."""
     start = f"{year}-01-01T00:00:00"
@@ -50,7 +51,7 @@ if __name__ == "__main__":
         cpu_partitions = "--partition=cimes"
         gpu_partitions = "--partition=gpu"
 
-    years = range(2018, 2025)
+    years = range(2018, 2026)
     users = []
     gpu_users = []
     ondemand_users = []
@@ -75,7 +76,8 @@ if __name__ == "__main__":
         ### GPU-HOURS ###
         action = f"-o elapsedraw,alloctres {gpu_partitions}" + r" | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
         if cluster == "adroit":
-            cloud = {2018:0, 2019:0, 2020:0, 2021:0, 2022:0, 2023:6, 2024:10241}
+            # JON to get 2025: sacct -M adroit -a -X -P -n -S 2025-01-01T00:00:00 -E 2025-12-31T23:59:59 -r cloud -o elapsedraw | awk '{sum += $1} END {print sum/3600}'
+            cloud = {2018:0, 2019:0, 2020:0, 2021:0, 2022:0, 2023:6, 2024:10241, 2025:9854} # this line appear again below
             gpu_hours.append(get_from_sacct(year, cluster, action) + cloud[year])
         else:
             gpu_hours.append(get_from_sacct(year, cluster, action))
@@ -93,7 +95,7 @@ if __name__ == "__main__":
 
             action = f"-o elapsedraw,alloctres,jobname {gpu_partitions}" + r" | grep sys/dashboard | grep gres/gpu=[1-9] | sed -E 's/\|.*gpu=/,/' | awk -F',' '{sum += $1*$2} END {print int(sum/3600)}'"
             if cluster == "adroit":
-                cloud = {2018:0, 2019:0, 2020:0, 2021:0, 2022:0, 2023:6, 2024:10241}
+                cloud = {2018:0, 2019:0, 2020:0, 2021:0, 2022:0, 2023:6, 2024:10241, 2025:9854}
                 ondemand_gpu_hours.append(get_from_sacct(year, cluster, action) + cloud[year])
             else:
                 ondemand_gpu_hours.append(get_from_sacct(year, cluster, action))
@@ -117,6 +119,7 @@ if __name__ == "__main__":
             "linewidth":1,
             "markersize":6,
             "color":'lightgrey'}
+    xfont = 8
 
     if cluster == "adroit":
         nrows = 3
@@ -127,43 +130,43 @@ if __name__ == "__main__":
         plt.plot(years, users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of Users")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
         plt.subplot(nrows, ncols, 2)
         plt.plot(years, gpu_users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of GPU Users")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
         plt.subplot(nrows, ncols, 3)
         plt.plot(years, ondemand_users, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("Number of OOD Users")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
         plt.subplot(nrows, ncols, 4)
         plt.plot(years, [x/1e6 for x in cpu_hours], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("CPU-Hours / $10^6$")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
         plt.subplot(nrows, ncols, 5)
         plt.plot(years, gpu_hours, 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("GPU-Hours")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
         plt.subplot(nrows, ncols, 6)
         plt.plot(years,  [x / y for x, y in zip(ondemand_cpu_hours, cpu_hours)], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("OOD CPU-Hours / CPU-Hours")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
         plt.subplot(nrows, ncols, 7)
         plt.plot(years,  [x / y for x, y in zip(ondemand_gpu_hours, gpu_hours)], 'o', **opts)
         plt.xlabel("Year")
         plt.ylabel("OOD GPU-Hours / GPU-Hours")
-        plt.xticks(years, map(str, years))
+        plt.xticks(years, map(str, years), fontsize=xfont)
 
     elif cluster == "traverse":
         nrows = 2
