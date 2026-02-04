@@ -556,7 +556,15 @@ else:
 
 
 
-
+#df[["jobid", "cpu-hours"]].to_csv("out.1")
+"""
+find missing jobs between saccta and sacct
+import pandas as pd
+py = pd.read_csv("out.1")
+tr = pd.read_csv("true.1", sep="|")
+df = pd.merge(tr, py, on="jobid", how="left")
+print(df[(df["cpusecs"] > 0) & pd.isna(df["cpu-hours"])].to_string())
+"""
 # T O T A L S
 print("Total CPU-Hours:", round(df["cpu-hours"].sum()))
 print("Total CPU-Only-Hours:", round(df["cpu-only-hours"].sum()))
