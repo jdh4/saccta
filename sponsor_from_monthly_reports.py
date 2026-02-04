@@ -127,7 +127,7 @@ class SponsorFromMonthlyReports:
 
     def __str__(self) -> str:
         msg = "\nFiles\n"
-        for sorted_file in s.sorted_files:
+        for sorted_file in self.sorted_files:
             secs = int(sorted_file.split(".")[-1])
             msg += f"{sorted_file}, {datetime.fromtimestamp(secs)}\n"
         msg += "\nUsers with a sponsor change\n"
