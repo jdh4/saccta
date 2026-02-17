@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 # sacct -M stellar -a -X -n -S 2024-01-01T00:00:00 -E 2024-12-31T23:59:59 -o cputimeraw -r cimes | awk '{sum += $1} END {print int(sum/3600)}'
 
 cluster = "stellar_amd"
-years = range(2021, 2025)
-users = [16, 35, 45, 60]
-cpu_hours = [36964540, 105417786, 58018452, 64509252]
+years = range(2021, 2026)
+users = [16, 35, 45, 60, 98]
+cpu_hours = [36964540, 105417786, 58018452, 64509252, 112639186]
 
 nrows = 1
 ncols = 3
