@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 # sacct -M stellar -a -X -n -S 2024-01-01T00:00:00 -E 2024-12-31T23:59:59 -r all,pppl,pu,serial -o user | sort | uniq | wc -l
 # sacct -M stellar -a -X -n -S 2024-01-01T00:00:00 -E 2024-12-31T23:59:59 -o cputimeraw -r all,pppl,pu,serial | awk '{sum += $1} END {print int(sum/3600)}'
 
-years = range(2021, 2025)
-users = [142, 205, 248, 314]
-cpu_hours = [120576358, 187413956, 204469745, 221210841]
+years = range(2021, 2026)
+users = [142, 205, 248, 314, 326]
+cpu_hours = [120576358, 187413956, 204469745, 221210841, 216581228]
 
 nrows = 1
 ncols = 3
