@@ -1,3 +1,21 @@
+"""
+nvidia_gpu_sm_occupancy_percent
+nvidia_gpu_sm_util_percent
+nvidia_gpu_fp16_util_percent
+nvidia_gpu_fp32_util_percent
+nvidia_gpu_fp64_util_percent
+nvidia_gpu_duty_cycle
+nvidia_gpu_memory_used_bytes
+nvidia_gpu_memory_total_bytes
+nvidia_gpu_any_tensor_util_percent
+nvidia_gpu_pcie_rx_per_sec
+nvidia_gpu_pcie_tx_per_sec
+nvidia_gpu_nvlink_total_rx_per_sec
+nvidia_gpu_nvlink_total_tx_per_sec
+DCGM_FI_PROF_PIPE_FP64_ACTIVE
+DCGM_FI_PROF_SM_OCCUPANCY
+"""
+
 import os
 import re
 import ast
