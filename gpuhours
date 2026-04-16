@@ -132,6 +132,7 @@ if __name__ == "__main__":
                              end_date,
                              fields)
     df = clean_dataframe(df)
+    print("")
     print(f" GPU-Hours: {round(df['gpu-hours'].sum())}")
     print(f"      User: {args.user}")
     print(f"Start Date: {start_date}")
@@ -140,6 +141,5 @@ if __name__ == "__main__":
     print(f"  Accounts: {', '.join(df.account.unique().tolist())}")
     print(f"      Jobs: {len(df)}")
     if "mig" in df.partition.unique():
-        print("WARNING: mig GPU-hours not reduced by 1/7")
-    if clusters == "adroit":
-        print("WARNING: cloud GPU-hours not included")
+        print("*** WARNING: mig GPU-hours not reduced by 1/7 ***")
+    print("")
