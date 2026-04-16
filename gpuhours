@@ -1,0 +1,145 @@
+#!/usr/licensed/anaconda3/2025.12/bin/python
+
+"""
+The code computes the number of consumed GPU-hours of a user.
+
+Usage:
+
+    $ gpuhours --help
+
+    $ gpuhours
+
+    $ gpuhours -u aturing -d 30
+
+    $ gpuhours -u aturing -d 45 -A church -r ailab
+
+RawUsage from sshare decays with a half-life of 15 days. To see which
+quantities affect it:
+
+    $ scontrol show config | grep -i AccountingStorageTRES
+"""
+
+import os
+import subprocess
+import re
+import socket
+from datetime import datetime, timedelta
+import argparse
+import pandas as pd
+
+
+os.environ["SLURM_TIME_FORMAT"] = "%s"
+
+
+def get_data_from_sacct(user: str,
+                        clusters: str,
+                        partition: str,
+                        account: str,
+                        start_date: str,
+                        end_date: str,
+                        fields: str) -> pd.DataFrame:
+    """Return a dataframe of the sacct output."""
+    cmd = f"sacct -u {user} -M {clusters} -X -P -n -S {start_date} -E {end_date} -o {fields}"
+    if partition:
+        cmd += f" -r {partition}"
+    if account:
+        cmd += f" -A {account}"
+    try:
+        output = subprocess.run(cmd,
+                                stdout=subprocess.PIPE,
+                                shell=True,
+                                timeout=100,
+                                text=True,
+                                check=True)
+        output.check_returncode()
+    except subprocess.CalledProcessError as error:
+         msg = f"Error running sacct.\n{error.stderr}"
+         raise RuntimeError(msg) from error
+    rows = output.stdout.strip().split('\n')
+    cols = fields.split(",")
+    raw = pd.DataFrame([row.split("|")[:len(cols)]
+                       for row in rows if row.count("|") > len(cols) - 2])
+    raw.columns = cols
+    return raw
+
+
+def gpus_per_job(tres: str) -> int:
+    """Return the number of allocated GPUs."""
+    gpus = re.findall(r"gres/gpu=\d+", tres)
+    return int(gpus[0].replace("gres/gpu=", "")) if gpus else 0
+
+
+def clean_dataframe(df: pd.DataFrame):
+    """Clean the dataframe and set data types."""
+    for col in ["elapsedraw", "start"]:
+        df = df[pd.notna(df[col])]
+        df = df[df[col].str.isnumeric()]
+        df[col] = df[col].astype("int64")
+    df = df[df.elapsedraw > 0]
+    df["gpus"] = df.alloctres.apply(gpus_per_job)
+    df["gpu-hours"] = df["gpus"] * df["elapsedraw"] / 3600
+    return df
+
+
+def get_past_date(days: int) -> str:
+    """Returns the date from 'days' ago in YYYY-MM-DD format."""
+    past_date = datetime.now() - timedelta(days=days)
+    return past_date.strftime('%Y-%m-%d')
+
+
+def get_clusters(clusters: str):
+    """Return the name of the cluster."""
+    if not clusters:
+        host = socket.gethostname()
+        if "adroit" in host:
+            return "adroit"
+        elif "della" in host:
+            return "della"
+        elif "stellar" in host:
+            return "stellar"
+        elif "tiger" in host:
+            return "tiger3"
+        else:
+            raise RuntimeError("cluster not found")
+    return clusters
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='gpuhours')
+    parser.add_argument('-u', '--user', type=str, action='store',
+                        default=os.environ["USER"], help='Specify the username')
+    parser.add_argument('-d', '--days', type=int, default=7, metavar='N',
+                        help='Calculate over this many previous days from now (default: 7)')
+    parser.add_argument('-M', '--clusters', type=str, default="",
+                        help='Specify cluster(s) (e.g., --clusters=della)')
+    parser.add_argument('-r', '--partition', type=str, default="",
+                        help='Specify partition(s) (e.g., --partition=gpu,ailab)')
+    parser.add_argument('-A', '--account', type=str, default="",
+                        help='Specify a Slurm account (e.g., --account=cbe)')
+    args = parser.parse_args()
+
+    clusters = get_clusters(args.clusters)
+    start_date = get_past_date(args.days)
+    end_date = "now"
+    fields = "partition,account,elapsedraw,alloctres,start"
+
+    df = get_data_from_sacct(args.user,
+                             clusters,
+                             args.partition,
+                             args.account,
+                             start_date,
+                             end_date,
+                             fields)
+    df = clean_dataframe(df)
+    print(f" GPU-Hours: {round(df['gpu-hours'].sum())}")
+    print(f"      User: {args.user}")
+    print(f"Start Date: {start_date}")
+    print(f"  Clusters: {clusters}")
+    print(f"Partitions: {', '.join(df.partition.unique().tolist())}")
+    print(f"  Accounts: {', '.join(df.account.unique().tolist())}")
+    print(f"      Jobs: {len(df)}")
+    if "mig" in df.partition.unique():
+        print("WARNING: mig GPU-hours not reduced by 1/7")
+    if clusters == "adroit":
+        print("WARNING: cloud GPU-hours not included")
