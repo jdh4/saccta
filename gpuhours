@@ -59,6 +59,8 @@ def get_data_from_sacct(user: str,
     cols = fields.split(",")
     raw = pd.DataFrame([row.split("|")[:len(cols)]
                        for row in rows if row.count("|") > len(cols) - 2])
+    if raw.empty:
+        return pd.DataFrame(columns=cols)
     raw.columns = cols
     return raw
 
@@ -69,7 +71,14 @@ def gpus_per_job(tres: str) -> int:
     return int(gpus[0].replace("gres/gpu=", "")) if gpus else 0
 
 
-def clean_dataframe(df: pd.DataFrame):
+def mig_correction(row: pd.Series) -> int | float:
+    """Correct the GPU-hours for jobs that ran on a 1/7 MIG instance."""
+    if row["cluster"] == "della" and row["partition"] == "mig":
+        return row["gpu-hours"] / 7
+    return row["gpu-hours"]
+
+
+def clean_dataframe(df: pd.DataFrame, mig_corr: bool):
     """Clean the dataframe and set data types."""
     for col in ["elapsedraw", "start"]:
         df = df[pd.notna(df[col])]
@@ -78,6 +87,8 @@ def clean_dataframe(df: pd.DataFrame):
     df = df[df.elapsedraw > 0]
     df["gpus"] = df.alloctres.apply(gpus_per_job)
     df["gpu-hours"] = df["gpus"] * df["elapsedraw"] / 3600
+    if mig_corr:
+        df["gpu-hours"] = df.apply(mig_correction, axis="columns")
     return df
 
 
@@ -117,12 +128,14 @@ if __name__ == "__main__":
                         help='Specify partition(s) (e.g., --partition=gpu,ailab)')
     parser.add_argument('-A', '--account', type=str, default="",
                         help='Specify a Slurm account (e.g., --account=cbe)')
+    parser.add_argument('--mig', action='store_true', default=False,
+                        help='Reduce GPU-hours on Della (mig) by factor of 1/7')
     args = parser.parse_args()
 
     clusters = get_clusters(args.clusters)
     start_date = get_past_date(args.days)
     end_date = "now"
-    fields = "partition,account,elapsedraw,alloctres,start"
+    fields = "cluster,partition,account,elapsedraw,alloctres,start"
 
     df = get_data_from_sacct(args.user,
                              clusters,
@@ -131,7 +144,7 @@ if __name__ == "__main__":
                              start_date,
                              end_date,
                              fields)
-    df = clean_dataframe(df)
+    df = clean_dataframe(df, args.mig)
     print("")
     print(f" GPU-Hours: {round(df['gpu-hours'].sum())}")
     print(f"      User: {args.user}")
@@ -140,6 +153,8 @@ if __name__ == "__main__":
     print(f"Partitions: {', '.join(df.partition.unique().tolist())}")
     print(f"  Accounts: {', '.join(df.account.unique().tolist())}")
     print(f"      Jobs: {len(df)}")
-    if "mig" in df.partition.unique():
-        print("*** WARNING: mig GPU-hours not reduced by 1/7 ***")
+    if "mig" in df.partition.unique() and not args.mig:
+        print("\n*** WARNING: mig GPU-hours not reduced by 1/7 ***")
+    if args.mig:
+        print("\nNote: mig GPU-hours were reduced by 1/7")
     print("")
