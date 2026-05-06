@@ -86,8 +86,9 @@ def clean_dataframe(df: pd.DataFrame, mig_corr: bool):
         df[col] = df[col].astype("int64")
     df = df[df.elapsedraw > 0]
     df["gpus"] = df.alloctres.apply(gpus_per_job)
+    df = df[df.gpus > 0]
     df["gpu-hours"] = df["gpus"] * df["elapsedraw"] / 3600
-    if mig_corr:
+    if not df.empty and mig_corr:
         df["gpu-hours"] = df.apply(mig_correction, axis="columns")
     return df
 
