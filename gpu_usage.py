@@ -59,9 +59,11 @@ def get_data_from_sacct(clusters: str,
                             timeout=100,
                             text=True,
                             check=True)
-    rows = [row.split("|") for row in output.stdout.split()]
-    df = pd.DataFrame(rows)
-    df.columns = fields.split(",")
+    rows = output.stdout.strip().split('\n')
+    cols = fields.split(",")
+    df = pd.DataFrame([row.split("|")[:len(cols)]
+                      for row in rows if row.count("|") > len(cols) - 2])
+    df.columns = cols
     return df
 
 
