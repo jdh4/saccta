@@ -48,13 +48,12 @@ def get_ai_metric(metric: str,
                   end: int) -> List[Union[int, float]]:
     """Compute the operation for a given quantity and job details."""
     if op == "avg":
-        s = "avg_over_time(("
+        s = "avg_over_time("
     elif op == "max":
-        s = "max_over_time(("
+        s = "max_over_time("
     else:
         s = ""
-    q = s + metric + "{cluster=\"" + cluster + "\"} and nvidia_gpu_jobId == " \
-        + jobidraw + ")[" + str(elapsed) + "s:])"
+    q = s + metric + f'{{cluster="{cluster}", jobid="{jobidraw}"}}[{str(elapsed)}s:])'
     params = {'query': q, 'time': end}
     print(params)
     response = requests.get(PROM_SERVER, params)
